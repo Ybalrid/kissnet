@@ -249,6 +249,7 @@ namespace kissnet
 			if constexpr(sock_proto == protocol::udp)
 			{
 				sin.sin_addr.s_addr = htonl(INADDR_ANY);
+				sin.sin_port		= htons(bind_loc.port);
 				memset(&sin.sin_zero, 0, 8);
 				if(syscall_bind(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) < 0)
 				{
