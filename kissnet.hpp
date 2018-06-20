@@ -7,6 +7,99 @@
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
+#include <string>
+
+#ifdef _WIN32
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+using ioctl_setting = u_long;
+
+//Handle WinSock2/Windows Socket API initialziation and cleanup
+#pragma comment(lib, "Ws2_32.lib")
+namespace kissnet
+{
+
+	struct WSA;
+	namespace internal_state
+	{
+		static WSA* global_WSA = nullptr;
+	}
+
+	struct WSA : std::enable_shared_from_this<WSA>
+	{
+		WSADATA wsa_data;
+		WSA()
+		{
+			WSAStartup(MAKEWORD(2, 2), &wsa_data);
+		}
+
+		~WSA()
+		{
+			WSACleanup();
+			internal_state::global_WSA = nullptr;
+		}
+
+		std::shared_ptr<WSA> getPtr()
+		{
+			return shared_from_this();
+		}
+	};
+
+	std::shared_ptr<WSA> getWSA()
+	{
+		if(internal_state::global_WSA)
+			return internal_state::global_WSA->getPtr();
+
+		//Create shared_ptr
+		auto wsa = std::make_shared<WSA>();
+
+		internal_state::global_WSA = wsa.get();
+		return wsa;
+	}
+
+#define KISSNET_OS_SPECIFIC std::shared_ptr<kissnet::WSA> wsa_ptr
+#define KISSNET_OS_INIT wsa_ptr = kissnet::getWSA()
+}
+#else //UNIX platform
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>
+
+using ioctl_setting = int;
+
+//To get consistant socket API between Windows and Linux:
+static const int INVALID_SOCKET = -1;
+static const int SOCKET_ERROR   = -1;
+using SOCKET					= int;
+using SOCKADDR_IN				= sockaddr_in;
+using SOCKADDR					= sockaddr;
+using IN_ADDR					= in_addr;
+
+//Wrap them in their WIN32 names
+int closesocket(SOCKET in)
+{
+	return close(in);
+}
+
+template <typename... Params>
+int ioctlsocket(int fd, int request, Params&&... params)
+{
+	return ioctl(fd, request, params...);
+}
+
+#define KISSNET_OS_SPECIFIC
+#define KISSNET_OS_INIT
+
+#endif
 
 ///Main namespace of kissnet
 namespace kissnet
@@ -21,94 +114,6 @@ namespace kissnet
 			 std::runtime_error("Cannot create endpoint "s + error)
 			{}
 		};
-	}
-
-	///stash all the global C crap from the operating system inside kissnet::os::
-	namespace os
-	{
-#ifdef _WIN32
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
-		//Handle WinSock2/Windows Socket API initialziation and cleanup
-#pragma comment(lib, "Ws2_32.lib")
-		struct WSA;
-		namespace internal_state
-		{
-			static WSA* global_WSA = nullptr;
-		}
-
-		struct WSA : std::enable_shared_from_this<WSA>
-		{
-			WSADATA wsa_data;
-			WSA()
-			{
-				WSAStartup(MAKEWORD(2, 2) n & wsa_data);
-			}
-
-			~WSA()
-			{
-				WSACleanup();
-				internal_state::global_WSA = nullptr;
-			}
-
-			std::shared_ptr<WSA> getPtr()
-			{
-				return shared_from_this();
-			}
-		};
-
-		std::shared_ptr<WSA> getWSA()
-		{
-			if(internal_state::global_WSA)
-				return internal_state::global_WSA->getPtr();
-
-			//Create shared_ptr
-			auto wsa = std::make_shared<WSA>();
-
-			internal_state::global_WSA = wsa.get();
-			return wsa;
-		}
-
-#define KISSNET_OS_SPECIFIC std::shared_ptr<WSA> wsa_ptr
-#define KISSNET_OS_INIT wsa_ptr = getWSA()
-#else //UNIX platform
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <unistd.h>
-
-		//To get consistant socket API between Windows and Linux:
-		static const int INVALID_SOCKET = -1;
-		static const int SOCKET_ERROR   = -1;
-		using SOCKET					= int;
-		using SOCKADDR_IN				= sockaddr_in;
-		using SOCKADDR					= sockaddr;
-		using IN_ADDR					= in_addr;
-
-		//Wrap them in their WIN32 names
-		int closesocket(SOCKET in)
-		{
-			return close(in);
-		}
-
-		template <typename... Params>
-		int ioctlsocket(int fd, int request, Params&&... params)
-		{
-			return ioctl(fd, request, params...);
-		}
-
-#define KISSNET_OS_SPECIFIC
-#define KISSNET_OS_INIT
-
-#endif
 	}
 
 	///low level protocol used, between TCP and UDP
@@ -160,6 +165,12 @@ namespace kissnet
 		}
 	};
 
+	//Wrap "system calls" here to avoid conflicts with the names used in the socket class
+	auto syscall_socket = [](int af, int type, int protocol) { return socket(af, type, protocol); };
+	auto syscall_recv   = [](SOCKET s, char* buff, int len, int flags) { return recv(s, buff, len, flags); };
+	auto syscall_send   = [](SOCKET s, const char* buff, int len, int flags) { return send(s, buff, len, flags); };
+	auto syscall_bind   = [](SOCKET s, const struct sockaddr* name, int namelen) { return bind(s, name, namelen); };
+
 	///Class that represent a socket
 	template <protocol sock_proto>
 	class socket
@@ -171,15 +182,15 @@ namespace kissnet
 		endpoint bind_loc;
 
 		///operatic-system type for a socket object
-		os::SOCKET sock;
+		SOCKET sock;
 
 		///hostinfo structure
-		os::hostent* hostinfo = nullptr;
+		hostent* hostinfo = nullptr;
 
 		///sockaddr struct
-		os::SOCKADDR_IN sin = { 0 };
-		os::SOCKADDR sout   = { 0 };
-		os::socklen_t sout_len;
+		SOCKADDR_IN sin = { 0 };
+		SOCKADDR sout   = { 0 };
+		socklen_t sout_len;
 
 	public:
 		///Construc socket and (if applicable) connect to the endpoint
@@ -190,62 +201,68 @@ namespace kissnet
 			int type;
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				type = os::SOCK_STREAM;
+				type = SOCK_STREAM;
 			}
 			if constexpr(sock_proto == protocol::udp)
 			{
-				type = os::SOCK_DGRAM;
+				type = SOCK_DGRAM;
 			}
 
 			KISSNET_OS_INIT;
 
-			sock = os::socket(AF_INET, type, 0);
-			if(sock == os::INVALID_SOCKET)
+			sock = syscall_socket(AF_INET, type, 0);
+			if(sock == INVALID_SOCKET)
 			{
 				//error here
 				std::cerr << "invalid socket\n";
 			}
 
-			hostinfo = os::gethostbyname(bind_loc.address.c_str());
+			hostinfo = gethostbyname(bind_loc.address.c_str());
 			if(!hostinfo)
 			{
 				//error here
 				std::cerr << "hostinfo is null\n";
 			}
 
-			sin.sin_addr   = *(os::IN_ADDR*)hostinfo->h_addr;
-			sin.sin_port   = os::htons(bind_loc.port);
+			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
+			sin.sin_port   = htons(bind_loc.port);
 			sin.sin_family = AF_INET;
 
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				if(os::connect(sock, (os::SOCKADDR*)&sin, sizeof(os::SOCKADDR)) == os::SOCKET_ERROR)
+				if(connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
 				{
 					//error here
 					std::cerr << "connect failed\n";
 				}
 			}
 
+			//ioctl_setting set = 1;
+			//ioctlsocket(sock, FIONBIO, &set);
+
+			//Fill sout with 0s
+			memset((void*)&sout, 0, sizeof sout);
+		}
+
+		void bind()
+		{
 			if constexpr(sock_proto == protocol::udp)
 			{
-				if(os::bind(sock, (os::SOCKADDR*)&sin, sizeof(os::SOCKADDR)) < 0)
+				sin.sin_addr.s_addr = htonl(INADDR_ANY);
+				memset(&sin.sin_zero, 0, 8);
+				if(syscall_bind(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) < 0)
 				{
 					//error here
 					std::cerr << "bind failed";
 				}
 			}
-			int set = 1;
-			os::ioctlsocket(sock, FIONBIO, &set);
-
-			//Fill sout with 0s
-			memset((void*)&sout, 0, sizeof sout);
 		}
 
 		///Close socket on descturction
 		~socket()
 		{
 			if(!(sock < 0))
-				os::closesocket(sock);
+				closesocket(sock);
 		}
 
 		///Send some bytes through the pipe
@@ -253,12 +270,12 @@ namespace kissnet
 		{
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				os::send(sock, read_buff, lenght, 0);
+				syscall_send(sock, (const char*)read_buff, lenght, 0);
 			}
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				os::sendto(sock, read_buff, lenght, 0, (os::SOCKADDR*)&sin, sizeof sin);
+				sendto(sock, (const char*)read_buff, lenght, 0, (SOCKADDR*)&sin, sizeof sin);
 			}
 		}
 
@@ -270,12 +287,12 @@ namespace kissnet
 			auto n = 0;
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				n = os::recv(sock, write_buff.data(), buff_size, 0);
+				n = syscall_recv(sock, (char*)write_buff.data(), write_buff.size(), 0);
 			}
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				n = os::recvfrom(sock, write_buff.data(), buff_size, 0, &sout, &sout_len);
+				n = recvfrom(sock, (char*)write_buff.data(), write_buff.size(), 0, &sout, &sout_len);
 			}
 
 			if(n < 0)
@@ -290,7 +307,7 @@ namespace kissnet
 		///Return the endpoint where this socket is talking to
 		endpoint get_bind_loc()
 		{
-			return get_bind_loc();
+			return bind_loc;
 		}
 
 		///Return an endpoint that originated the data in the last recv
@@ -300,16 +317,16 @@ namespace kissnet
 				return get_bind_loc;
 			if constexpr(sock_proto == protocol::udp)
 			{
-				auto ip_sout = reinterpret_cast<os::SOCKADDR_IN*>(&sout);
-				return { os::inet_ntoa(ip_sout->sin_addr), ip_sout->sin_port };
+				auto ip_sout = reinterpret_cast<SOCKADDR_IN*>(&sout);
+				return { inet_ntoa(ip_sout->sin_addr), ip_sout->sin_port };
 			}
 		}
 
 		///Return the number of bytes availabe inside the socket
 		size_t bytes_available()
 		{
-			static auto size = 0;
-			auto status		 = os::ioctlsocket(sock, FIONREAD, &size);
+			static ioctl_setting size = 0;
+			auto status				  = ioctlsocket(sock, FIONREAD, &size);
 
 			if(status < 0)
 			{
