@@ -248,9 +248,7 @@ namespace kissnet
 		{
 			if constexpr(sock_proto == protocol::udp)
 			{
-				sin.sin_addr.s_addr = htonl(INADDR_ANY);
-				sin.sin_port		= htons(bind_loc.port);
-				memset(&sin.sin_zero, 0, 8);
+
 				if(syscall_bind(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) < 0)
 				{
 					//error here
@@ -293,7 +291,8 @@ namespace kissnet
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				n = recvfrom(sock, (char*)write_buff.data(), write_buff.size(), 0, &sout, &sout_len);
+				sout_len = sizeof sout;
+				n		 = recvfrom(sock, (char*)write_buff.data(), write_buff.size(), 0, &sout, &sout_len);
 			}
 
 			if(n < 0)

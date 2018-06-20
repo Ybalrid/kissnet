@@ -49,7 +49,7 @@ int main()
 
 		std::cout << "avaliable in UDP socket : " << b_socket.bytes_available() << " bytes\n";
 		b_socket.recv(recv_buff);
-		auto from = a_socket.get_recv_endpoint();
+		auto from = b_socket.get_recv_endpoint();
 
 		std::cout << "Received: ";
 
