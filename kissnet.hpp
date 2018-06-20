@@ -5,6 +5,7 @@
 #include <memory>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 
 ///Main namespace of kissnet
@@ -78,11 +79,13 @@ namespace kissnet
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <unistd.h>
 
+		//To get consistant socket API between Windows and Linux:
 		static const int INVALID_SOCKET = -1;
 		static const int SOCKET_ERROR   = -1;
 		using SOCKET					= int;
@@ -90,9 +93,16 @@ namespace kissnet
 		using SOCKADDR					= sockaddr;
 		using IN_ADDR					= in_addr;
 
+		//Wrap them in their WIN32 names
 		int closesocket(SOCKET in)
 		{
 			return close(in);
+		}
+
+		template <typename... Params>
+		int ioctlsocket(int fd, int request, Params&&... params)
+		{
+			return ioctl(fd, request, params...);
 		}
 
 #define KISSNET_OS_SPECIFIC
@@ -168,6 +178,8 @@ namespace kissnet
 
 		///sockaddr struct
 		os::SOCKADDR_IN sin = { 0 };
+		os::SOCKADDR sout   = { 0 };
+		os::socklen_t sout_len;
 
 	public:
 		///Construc socket and (if applicable) connect to the endpoint
@@ -213,6 +225,20 @@ namespace kissnet
 					std::cerr << "connect failed\n";
 				}
 			}
+
+			if constexpr(sock_proto == protocol::udp)
+			{
+				if(os::bind(sock, (os::SOCKADDR*)&sin, sizeof(os::SOCKADDR)) < 0)
+				{
+					//error here
+					std::cerr << "bind failed";
+				}
+			}
+			int set = 1;
+			os::ioctlsocket(sock, FIONBIO, &set);
+
+			//Fill sout with 0s
+			memset((void*)&sout, 0, sizeof sout);
 		}
 
 		///Close socket on descturction
@@ -225,25 +251,73 @@ namespace kissnet
 		///Send some bytes through the pipe
 		void send(std::byte* read_buff, size_t lenght)
 		{
-			os::send(sock, read_buff, lenght, 0);
+			if constexpr(sock_proto == protocol::tcp)
+			{
+				os::send(sock, read_buff, lenght, 0);
+			}
+
+			if constexpr(sock_proto == protocol::udp)
+			{
+				os::sendto(sock, read_buff, lenght, 0, (os::SOCKADDR*)&sin, sizeof sin);
+			}
 		}
 
 		///receive bytes inside the buffer, renturn the number of bytes you got
 		template <size_t buff_size>
 		size_t recv(buffer<buff_size>& write_buff)
 		{
-			auto n = os::recv(sock, write_buff.data(), buff_size - 1, 0);
+
+			auto n = 0;
+			if constexpr(sock_proto == protocol::tcp)
+			{
+				n = os::recv(sock, write_buff.data(), buff_size, 0);
+			}
+
+			if constexpr(sock_proto == protocol::udp)
+			{
+				n = os::recvfrom(sock, write_buff.data(), buff_size, 0, &sout, &sout_len);
+			}
+
 			if(n < 0)
 			{
 				//error here
 				std::cout << "recv is negative\n";
 			}
-			else
-			{
-				write_buff[n] = std::byte{ 0 };
-			}
 
 			return n;
+		}
+
+		///Return the endpoint where this socket is talking to
+		endpoint get_bind_loc()
+		{
+			return get_bind_loc();
+		}
+
+		///Return an endpoint that originated the data in the last recv
+		endpoint get_recv_endpoint()
+		{
+			if constexpr(sock_proto == protocol::tcp)
+				return get_bind_loc;
+			if constexpr(sock_proto == protocol::udp)
+			{
+				auto ip_sout = reinterpret_cast<os::SOCKADDR_IN*>(&sout);
+				return { os::inet_ntoa(ip_sout->sin_addr), ip_sout->sin_port };
+			}
+		}
+
+		///Return the number of bytes availabe inside the socket
+		size_t bytes_available()
+		{
+			static auto size = 0;
+			auto status		 = os::ioctlsocket(sock, FIONREAD, &size);
+
+			if(status < 0)
+			{
+				//error here?
+				std::cerr << "ioctlsocket status is negative\n";
+			}
+
+			return size > 0 ? size : 0;
 		}
 	};
 }
