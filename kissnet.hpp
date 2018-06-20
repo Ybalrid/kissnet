@@ -265,7 +265,7 @@ namespace kissnet
 		}
 
 		///Send some bytes through the pipe
-		void send(std::byte* read_buff, size_t lenght)
+		void send(const std::byte* read_buff, size_t lenght)
 		{
 			if constexpr(sock_proto == protocol::tcp)
 			{

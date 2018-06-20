@@ -13,22 +13,25 @@ int main()
 
 		//Create a "GET /" HTTP request, and send that packet into the socket
 		auto get_index_request = std::string{ "GET / HTTP/1.1\r\nHost: avalon.ybalird.info\r\n\r\n" };
-		a_socket.send((std::byte*)get_index_request.c_str(), get_index_request.size());
+
+		//Send request
+		a_socket.send(reinterpret_cast<const std::byte*>(get_index_request.c_str()), get_index_request.size());
 
 		//Receive data into a buffer
 		kissnet::buffer<4096> static_buffer;
 
 		std::this_thread::sleep_for(1s);
+
+
 		std::cout << "bytes available to read : " << a_socket.bytes_available() << '\n';
-
 		const auto data_size = a_socket.recv(static_buffer);
-
+		
+		//To print it as a string, add a null terminator
 		if(data_size < static_buffer.size())
-		{
 			static_buffer[data_size] = std::byte{ '\0' };
-		}
+
 		//Print the raw data as text into the terminal
-		std::cout << (char*)static_buffer.data() << '\n';
+		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
 	}
 
 	{
