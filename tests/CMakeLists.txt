@@ -9,3 +9,6 @@ INCLUDE_DIRECTORIES(..)
 ADD_SUBDIRECTORY(simple_test)
 ADD_SUBDIRECTORY(endpoint_test)
 ADD_SUBDIRECTORY(socket_test)
+ADD_SUBDIRECTORY(acceptor_test)
+ADD_SUBDIRECTORY(error_handler_test)
+

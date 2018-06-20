@@ -11,6 +11,8 @@ int main()
 		//Create a kissnet socket
 		kissnet::socket<kissnet::protocol::tcp> a_socket(kissnet::endpoint("avalon.ybalrid.info:80"));
 
+		a_socket.connect();
+
 		//Create a "GET /" HTTP request, and send that packet into the socket
 		auto get_index_request = std::string{ "GET / HTTP/1.1\r\nHost: avalon.ybalird.info\r\n\r\n" };
 
@@ -25,7 +27,7 @@ int main()
 
 		std::cout << "bytes available to read : " << a_socket.bytes_available() << '\n';
 		const auto data_size = a_socket.recv(static_buffer);
-		
+
 		//To print it as a string, add a null terminator
 		if(data_size < static_buffer.size())
 			static_buffer[data_size] = std::byte{ '\0' };
@@ -38,7 +40,7 @@ int main()
 		kissnet::socket<kissnet::protocol::udp> a_socket(kissnet::endpoint("127.0.0.1", 6666));
 		kissnet::socket<kissnet::protocol::udp> b_socket(kissnet::endpoint("127.0.0.1", 6666));
 		b_socket.bind();
-		
+
 		kissnet::buffer<16> buff;
 
 		for(unsigned char i = 0; i < 16; i++)

@@ -1,6 +1,12 @@
 #ifndef KISS_NET
 #define KISS_NET
 
+#ifndef KISSNET_NO_EXCEP
+#define kissnet_error(STR) throw std::runtime_error(STR)
+#else
+#define kissnet_error(STR) kissnet::error::handle(STR);
+#endif
+
 #include <array>
 #include <memory>
 #include <cstddef>
@@ -12,6 +18,7 @@
 #ifdef _WIN32
 
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -61,8 +68,14 @@ namespace kissnet
 		return wsa;
 	}
 
-#define KISSNET_OS_SPECIFIC std::shared_ptr<kissnet::WSA> wsa_ptr
-#define KISSNET_OS_INIT wsa_ptr = kissnet::getWSA()
+#define KISSNET_OS_SPECIFIC_PAYLOAD_NAME wsa_ptr
+#define KISSNET_OS_SPECIFIC std::shared_ptr<kissnet::WSA> KISSNET_OS_SPECIFIC_PAYLOAD_NAME
+#define KISSNET_OS_INIT KISSNET_OS_SPECIFIC_PAYLOAD_NAME = kissnet::getWSA()
+
+	int get_error_code()
+	{
+		return WSAGetLastError();
+	}
 }
 #else //UNIX platform
 
@@ -96,8 +109,14 @@ int ioctlsocket(int fd, int request, Params&&... params)
 	return ioctl(fd, request, params...);
 }
 
+#define KISSNET_OS_SPECIFIC_PAYLOAD_NAME
 #define KISSNET_OS_SPECIFIC
 #define KISSNET_OS_INIT
+
+int get_error_code()
+{
+	return errno;
+}
 
 #endif
 
@@ -108,22 +127,39 @@ namespace kissnet
 
 	namespace error
 	{
-		struct cant_create_endpoint : public std::runtime_error
+		static void (*callback)(const std::string&, void* ctx) = nullptr;
+		static void* ctx									   = nullptr;
+		static bool abortOnError							   = true;
+
+		void handler(const std::string& str)
 		{
-			cant_create_endpoint(std::string error) :
-			 std::runtime_error("Cannot create endpoint "s + error)
-			{}
-		};
+			if(callback)
+			{
+				callback(str, ctx);
+			}
+			else
+			{
+				fputs(str.c_str(), stderr);
+			}
+
+			if(abortOnError)
+			{
+				abort();
+			}
+		}
 	}
 
 	///low level protocol used, between TCP and UDP
 	enum class protocol { tcp,
 						  udp };
 
-	///Byte buffer
-	template <size_t buff_size>
+	enum class ip {
+		v4,
+		v6
+	};
 
 	///buffer is an array of std::byte
+	template <size_t buff_size>
 	using buffer = std::array<std::byte, buff_size>;
 
 	///port_t is the port
@@ -163,19 +199,29 @@ namespace kissnet
 			address = addr.substr(0, separator);
 			port	= strtoul(addr.substr(separator + 1).c_str(), nullptr, 10);
 		}
+
+		endpoint(SOCKADDR addr)
+		{
+			SOCKADDR_IN ip_addr = *(SOCKADDR_IN*)(&addr);
+			address				= inet_ntoa(ip_addr.sin_addr);
+			port				= ip_addr.sin_port;
+		}
 	};
 
 	//Wrap "system calls" here to avoid conflicts with the names used in the socket class
-	auto syscall_socket = [](int af, int type, int protocol) { return socket(af, type, protocol); };
-	auto syscall_recv   = [](SOCKET s, char* buff, int len, int flags) { return recv(s, buff, len, flags); };
-	auto syscall_send   = [](SOCKET s, const char* buff, int len, int flags) { return send(s, buff, len, flags); };
-	auto syscall_bind   = [](SOCKET s, const struct sockaddr* name, int namelen) { return bind(s, name, namelen); };
+	auto syscall_socket  = [](int af, int type, int protocol) { return socket(af, type, protocol); };
+	auto syscall_recv	= [](SOCKET s, char* buff, int len, int flags) { return recv(s, buff, len, flags); };
+	auto syscall_send	= [](SOCKET s, const char* buff, int len, int flags) { return send(s, buff, len, flags); };
+	auto syscall_bind	= [](SOCKET s, const struct sockaddr* name, int namelen) { return bind(s, name, namelen); };
+	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, int namelen) { return bind(s, name, namelen); };
+	auto syscall_listen  = [](SOCKET s, int backlog) { return listen(s, backlog); };
+	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, int* addrlen) { return accept(s, addr, addrlen); };
 
 	///Class that represent a socket
-	template <protocol sock_proto>
+	template <protocol sock_proto, ip ipver = ip::v4>
 	class socket
 	{
-		///OS specific stuff
+		///OS specific stuff. payload we have to hold onto for RAII management of the Operating System's socket library (e.g. Windows Socket API WinSock2)
 		KISSNET_OS_SPECIFIC;
 
 		///Location where this socket is bound
@@ -192,13 +238,38 @@ namespace kissnet
 		SOCKADDR sout   = { 0 };
 		socklen_t sout_len;
 
+		socket() = default;
+
 	public:
+		socket(const socket&) = delete;
+		socket& operator=(const socket&) = delete;
+
+		socket(socket&& other)
+		{
+			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
+			bind_loc						 = std::move(other.bind_loc);
+			sock							 = std::move(other.sock);
+			sin								 = std::move(other.sin);
+			sout							 = std::move(other.sout);
+			sout_len						 = std::move(other.sout_len);
+
+			other.sock = -1;
+		}
+
+		//socket& operator=(socket&& other)
+		//{
+		//	return socket(other);
+		//}
+
 		///Construc socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
 		 bind_loc{ bind_to }
 		{
+			//operating system related housekeeping
+			KISSNET_OS_INIT;
+
 			//Do we use streams or datagrams
-			int type;
+			int type, familly;
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				type = SOCK_STREAM;
@@ -208,13 +279,56 @@ namespace kissnet
 				type = SOCK_DGRAM;
 			}
 
-			KISSNET_OS_INIT;
+			if constexpr(ipver == ip::v4)
+			{
+				familly = AF_INET;
+			}
 
-			sock = syscall_socket(AF_INET, type, 0);
+			if constexpr(ipver == ip::v6)
+			{
+				familly = AF_INET6;
+			}
+
+			sock = syscall_socket(familly, type, 0);
 			if(sock == INVALID_SOCKET)
 			{
 				//error here
-				std::cerr << "invalid socket\n";
+				//std::cerr << "invalid socket\n";
+			}
+
+			hostinfo = gethostbyname(bind_loc.address.c_str());
+			if(!hostinfo)
+			{
+				//error here
+				//std::cerr << "hostinfo is null\n";
+			}
+
+			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
+			sin.sin_port   = htons(bind_loc.port);
+			sin.sin_family = familly;
+
+			//ioctl_setting set = 1;
+			//ioctlsocket(sock, FIONBIO, &set);
+
+			//Fill sout with 0s
+			memset((void*)&sout, 0, sizeof sout);
+		}
+
+		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
+		socket(SOCKET native_sock, endpoint bind_to) :
+		 sock{ native_sock }, bind_loc(bind_to)
+		{
+
+			int familly;
+
+			if constexpr(ipver == ip::v4)
+			{
+				familly = AF_INET;
+			}
+
+			if constexpr(ipver == ip::v6)
+			{
+				familly = AF_INET6;
 			}
 
 			hostinfo = gethostbyname(bind_loc.address.c_str());
@@ -226,37 +340,60 @@ namespace kissnet
 
 			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
 			sin.sin_port   = htons(bind_loc.port);
-			sin.sin_family = AF_INET;
-
-			if constexpr(sock_proto == protocol::tcp)
-			{
-				if(connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
-				{
-					//error here
-					std::cerr << "connect failed\n";
-				}
-			}
-
-			//ioctl_setting set = 1;
-			//ioctlsocket(sock, FIONBIO, &set);
-
-			//Fill sout with 0s
-			memset((void*)&sout, 0, sizeof sout);
+			sin.sin_family = familly;
 		}
 
+		///Bind socket locally using hte address and port of the endpoint
 		void bind()
 		{
-			if constexpr(sock_proto == protocol::udp)
-			{
 
-				if(syscall_bind(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) < 0)
+			if(syscall_bind(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
+			{
+				kissnet_error("bind() failed\n");
+			}
+		}
+
+		///(For TCP) connect to the endpoint as client
+		void connect()
+		{
+			if constexpr(sock_proto == protocol::tcp) //only TCP is a connected protocol
+			{
+				if(syscall_connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
 				{
-					//error here
-					std::cerr << "bind failed";
+					kissnet_error("connect failed\n");
 				}
 			}
 		}
 
+		///(for TCP= setup socket to listen to connection. Need to be called on binded socket, before being able to accept()
+		void listen()
+		{
+			if constexpr(sock_proto == protocol::tcp)
+			{
+				if(syscall_listen(sock, SOMAXCONN) == SOCKET_ERROR)
+				{
+					kissnet_error("listen failed\n");
+				}
+			}
+		}
+
+		///(for TCP) Wait for incomming connection, return socket connect to the client. Blocking.
+		socket accept()
+		{
+			if constexpr(sock_proto != protocol::tcp)
+				return { INVALID_SOCKET, {} };
+
+			SOCKADDR addr;
+			SOCKET s	   = INVALID_SOCKET;
+			socklen_t size = sizeof addr;
+
+			if((s = syscall_accept(sock, &addr, &size)) == INVALID_SOCKET)
+			{
+				kissnet_error("accept() returned an invalid socket\n");
+			}
+
+			return { s, endpoint(addr) };
+		}
 		///Close socket on descturction
 		~socket()
 		{
@@ -265,16 +402,16 @@ namespace kissnet
 		}
 
 		///Send some bytes through the pipe
-		void send(const std::byte* read_buff, size_t lenght)
+		size_t send(const std::byte* read_buff, size_t lenght)
 		{
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				syscall_send(sock, (const char*)read_buff, lenght, 0);
+				return syscall_send(sock, (const char*)read_buff, lenght, 0);
 			}
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				sendto(sock, (const char*)read_buff, lenght, 0, (SOCKADDR*)&sin, sizeof sin);
+				return sendto(sock, (const char*)read_buff, lenght, 0, (SOCKADDR*)&sin, sizeof sin);
 			}
 		}
 
@@ -297,10 +434,13 @@ namespace kissnet
 
 			if(n < 0)
 			{
-				//error here
-				std::cout << "recv is negative\n";
+				kissnet_error("recv status is negative\n");
 			}
 
+			if(n == 0)
+			{
+				//connection closed by remote? callback?
+			}
 			return n;
 		}
 
@@ -317,8 +457,7 @@ namespace kissnet
 				return get_bind_loc;
 			if constexpr(sock_proto == protocol::udp)
 			{
-				auto ip_sout = reinterpret_cast<SOCKADDR_IN*>(&sout);
-				return { inet_ntoa(ip_sout->sin_addr), ip_sout->sin_port };
+				return { sout };
 			}
 		}
 
@@ -330,8 +469,7 @@ namespace kissnet
 
 			if(status < 0)
 			{
-				//error here?
-				std::cerr << "ioctlsocket status is negative\n";
+				kissnet_error("ioctlsocket status is negative\n");
 			}
 
 			return size > 0 ? size : 0;
