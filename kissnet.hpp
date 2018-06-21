@@ -286,7 +286,8 @@ namespace kissnet
 			KISSNET_OS_INIT;
 
 			//Do we use streams or datagrams
-			int type, familly;
+			int type;
+			short familly;
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				type = SOCK_STREAM;
@@ -336,7 +337,7 @@ namespace kissnet
 		 sock{ native_sock }, bind_loc(bind_to)
 		{
 
-			int familly;
+			short familly;
 
 			if constexpr(ipver == ip::v4)
 			{

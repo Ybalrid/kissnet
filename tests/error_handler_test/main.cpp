@@ -11,6 +11,7 @@ int main()
 	{
 		std::cerr << "this is the callback : ";
 		std::cerr << str;
+		(void)ctx;
 	};
 
 
