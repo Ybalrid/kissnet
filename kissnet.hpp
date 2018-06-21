@@ -230,7 +230,7 @@ namespace kissnet
 		///operatic-system type for a socket object
 		SOCKET sock;
 
-        ///Location where this socket is bound
+		///Location where this socket is bound
 		endpoint bind_loc;
 
 		///hostinfo structure
@@ -461,7 +461,7 @@ namespace kissnet
 			{
 				//connection closed by remote? callback?
 			}
-			return n<0 ? 0 : n;
+			return n < 0 ? 0 : n;
 		}
 
 		///Return the endpoint where this socket is talking to
