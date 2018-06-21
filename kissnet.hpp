@@ -112,9 +112,9 @@ int ioctlsocket(int fd, int request, Params&&... params)
 	return ioctl(fd, request, params...);
 }
 
-#define KISSNET_OS_SPECIFIC_PAYLOAD_NAME
-#define KISSNET_OS_SPECIFIC
-#define KISSNET_OS_INIT
+#define KISSNET_OS_SPECIFIC_PAYLOAD_NAME dummy
+#define KISSNET_OS_SPECIFIC char dummy
+#define KISSNET_OS_INIT dummy = 42;
 
 int get_error_code()
 {
@@ -351,8 +351,7 @@ namespace kissnet
 			hostinfo = gethostbyname(bind_loc.address.c_str());
 			if(!hostinfo)
 			{
-				//error here
-				std::cerr << "hostinfo is null\n";
+				kissnet_error("hostinfo is null\n");
 			}
 
 			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
