@@ -256,10 +256,24 @@ namespace kissnet
 			other.sock = -1;
 		}
 
-		//socket& operator=(socket&& other)
-		//{
-		//	return socket(other);
-		//}
+		socket& operator=(socket&& other)
+		{
+
+			if(this != &other)
+			{
+
+				if(!(sock < 0))
+					closesocket(sock);
+
+				KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
+				bind_loc						 = std::move(other.bind_loc);
+				sock							 = std::move(other.sock);
+				sin								 = std::move(other.sin);
+				sout							 = std::move(other.sout);
+				sout_len						 = std::move(other.sout_len);
+			}
+			return *this;
+		}
 
 		///Construc socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
@@ -360,7 +374,6 @@ namespace kissnet
 			{
 				if(syscall_connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
 				{
-					auto error = WSAGetLastError();
 					kissnet_error("connect failed\n");
 				}
 			}
@@ -435,18 +448,22 @@ namespace kissnet
 
 			if(n < 0)
 			{
-				kissnet_error("recv status is negative\n");
+				//note: in case of things like "conection reset by peer" it is not a real, irrecuperable error.
+				//TODO better handling of this:
+				//const auto code = get_error_code();
+				//fprintf(stderr, "%d\n", code);
+				//kissnet_error("recv status is negative\n");
 			}
 
 			if(n == 0)
 			{
 				//connection closed by remote? callback?
 			}
-			return n;
+			return n<0 ? 0 : n;
 		}
 
 		///Return the endpoint where this socket is talking to
-		endpoint get_bind_loc()
+		endpoint get_bind_loc() const
 		{
 			return bind_loc;
 		}
