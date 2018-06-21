@@ -200,7 +200,7 @@ namespace kissnet
 			}
 
 			address = addr.substr(0, separator);
-			port	= strtoul(addr.substr(separator + 1).c_str(), nullptr, 10);
+			port	= (port_t)strtoul(addr.substr(separator + 1).c_str(), nullptr, 10);
 		}
 
 		endpoint(SOCKADDR addr)
@@ -422,12 +422,12 @@ namespace kissnet
 		{
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				return syscall_send(sock, (const char*)read_buff, lenght, 0);
+				return syscall_send(sock, (const char*)read_buff, (buffsize_t)lenght, 0);
 			}
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				return sendto(sock, (const char*)read_buff, lenght, 0, (SOCKADDR*)&sin, sizeof sin);
+				return sendto(sock, (const char*)read_buff, (buffsize_t)lenght, 0, (SOCKADDR*)&sin, sizeof sin);
 			}
 		}
 
@@ -439,13 +439,13 @@ namespace kissnet
 			auto n = 0;
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				n = syscall_recv(sock, (char*)write_buff.data(), write_buff.size(), 0);
+				n = syscall_recv(sock, (char*)write_buff.data(), (buffsize_t)write_buff.size(), 0);
 			}
 
 			if constexpr(sock_proto == protocol::udp)
 			{
 				sout_len = sizeof sout;
-				n		 = recvfrom(sock, (char*)write_buff.data(), write_buff.size(), 0, &sout, &sout_len);
+				n		 = recvfrom(sock, (char*)write_buff.data(), (buffsize_t)write_buff.size(), 0, &sout, &sout_len);
 			}
 
 			if(n < 0)
