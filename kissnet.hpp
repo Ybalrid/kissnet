@@ -17,6 +17,7 @@
 
 #ifdef _WIN32
 
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -24,6 +25,7 @@
 #include <ws2tcpip.h>
 
 using ioctl_setting = u_long;
+using buffsize_t	= int;
 
 //Handle WinSock2/Windows Socket API initialziation and cleanup
 #pragma comment(lib, "Ws2_32.lib")
@@ -88,6 +90,7 @@ namespace kissnet
 #include <unistd.h>
 
 using ioctl_setting = int;
+using buffsize_t	= size_t;
 
 //To get consistant socket API between Windows and Linux:
 static const int INVALID_SOCKET = -1;
@@ -210,12 +213,12 @@ namespace kissnet
 
 	//Wrap "system calls" here to avoid conflicts with the names used in the socket class
 	auto syscall_socket  = [](int af, int type, int protocol) { return socket(af, type, protocol); };
-	auto syscall_recv	= [](SOCKET s, char* buff, int len, int flags) { return recv(s, buff, len, flags); };
-	auto syscall_send	= [](SOCKET s, const char* buff, int len, int flags) { return send(s, buff, len, flags); };
-	auto syscall_bind	= [](SOCKET s, const struct sockaddr* name, int namelen) { return bind(s, name, namelen); };
-	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, int namelen) { return connect(s, name, namelen); };
+	auto syscall_recv	= [](SOCKET s, char* buff, buffsize_t len, int flags) { return recv(s, buff, len, flags); };
+	auto syscall_send	= [](SOCKET s, const char* buff, buffsize_t len, int flags) { return send(s, buff, len, flags); };
+	auto syscall_bind	= [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return bind(s, name, namelen); };
+	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return connect(s, name, namelen); };
 	auto syscall_listen  = [](SOCKET s, int backlog) { return listen(s, backlog); };
-	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, int* addrlen) { return accept(s, addr, addrlen); };
+	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) { return accept(s, addr, addrlen); };
 
 	///Class that represent a socket
 	template <protocol sock_proto, ip ipver = ip::v4>
