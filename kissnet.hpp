@@ -2,9 +2,9 @@
 #define KISS_NET
 
 #ifndef KISSNET_NO_EXCEP
-#define kissnet_error(STR) throw std::runtime_error(STR)
+#define kissnet_fatal_error(STR) throw std::runtime_error(STR)
 #else
-#define kissnet_error(STR) kissnet::error::handle(STR);
+#define kissnet_fatal_error(STR) kissnet::error::handle(STR);
 #endif
 
 #include <array>
@@ -224,6 +224,12 @@ namespace kissnet
 	template <protocol sock_proto, ip ipver = ip::v4>
 	class socket
 	{
+		struct bytes_with_status
+		{
+			size_t bytes;
+			bool no_error;
+		};
+
 		///OS specific stuff. payload we have to hold onto for RAII management of the Operating System's socket library (e.g. Windows Socket API WinSock2)
 		KISSNET_OS_SPECIFIC;
 
@@ -352,7 +358,7 @@ namespace kissnet
 			hostinfo = gethostbyname(bind_loc.address.c_str());
 			if(!hostinfo)
 			{
-				kissnet_error("hostinfo is null\n");
+				kissnet_fatal_error("hostinfo is null\n");
 			}
 
 			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
@@ -366,19 +372,20 @@ namespace kissnet
 
 			if(syscall_bind(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
 			{
-				kissnet_error("bind() failed\n");
+				kissnet_fatal_error("bind() failed\n");
 			}
 		}
 
 		///(For TCP) connect to the endpoint as client
-		void connect()
+		bool connect()
 		{
 			if constexpr(sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
-				if(syscall_connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
+				if(syscall_connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) != SOCKET_ERROR)
 				{
-					kissnet_error("connect failed\n");
+					return true;
 				}
+				return false;
 			}
 		}
 
@@ -389,7 +396,7 @@ namespace kissnet
 			{
 				if(syscall_listen(sock, SOMAXCONN) == SOCKET_ERROR)
 				{
-					kissnet_error("listen failed\n");
+					kissnet_fatal_error("listen failed\n");
 				}
 			}
 		}
@@ -406,7 +413,7 @@ namespace kissnet
 
 			if((s = syscall_accept(sock, &addr, &size)) == INVALID_SOCKET)
 			{
-				kissnet_error("accept() returned an invalid socket\n");
+				kissnet_fatal_error("accept() returned an invalid socket\n");
 			}
 
 			return { s, endpoint(addr) };
@@ -434,10 +441,11 @@ namespace kissnet
 
 		///receive bytes inside the buffer, renturn the number of bytes you got
 		template <size_t buff_size>
-		size_t recv(buffer<buff_size>& write_buff)
+		bytes_with_status recv(buffer<buff_size>& write_buff)
 		{
 
 			auto n = 0;
+			bool status = true;
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				n = syscall_recv(sock, (char*)write_buff.data(), (buffsize_t)write_buff.size(), 0);
@@ -451,18 +459,14 @@ namespace kissnet
 
 			if(n < 0)
 			{
-				//note: in case of things like "conection reset by peer" it is not a real, irrecuperable error.
-				//TODO better handling of this:
-				//const auto code = get_error_code();
-				//fprintf(stderr, "%d\n", code);
-				//kissnet_error("recv status is negative\n");
+				status = false;
 			}
 
 			if(n == 0)
 			{
 				//connection closed by remote? callback?
 			}
-			return n < 0 ? 0 : n;
+			return {(size_t)(n < 0 ? 0 : n), status};
 		}
 
 		///Return the endpoint where this socket is talking to
@@ -490,7 +494,7 @@ namespace kissnet
 
 			if(status < 0)
 			{
-				kissnet_error("ioctlsocket status is negative\n");
+				kissnet_fatal_error("ioctlsocket status is negative when geting FIONREAD\n");
 			}
 
 			return size > 0 ? size : 0;

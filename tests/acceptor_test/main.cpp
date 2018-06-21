@@ -15,7 +15,7 @@ int main()
 
 	//Read once in a 1k buffer
 	kn::buffer<1024> buff;
-	const auto size = client.recv(buff);
+	const auto [size, status] = client.recv(buff);
 
 	//Add null terminator, and print as string
 	if(size < buff.size()) buff[size] = std::byte{ 0 };
