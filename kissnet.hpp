@@ -213,7 +213,7 @@ namespace kissnet
 	auto syscall_recv	= [](SOCKET s, char* buff, int len, int flags) { return recv(s, buff, len, flags); };
 	auto syscall_send	= [](SOCKET s, const char* buff, int len, int flags) { return send(s, buff, len, flags); };
 	auto syscall_bind	= [](SOCKET s, const struct sockaddr* name, int namelen) { return bind(s, name, namelen); };
-	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, int namelen) { return bind(s, name, namelen); };
+	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, int namelen) { return connect(s, name, namelen); };
 	auto syscall_listen  = [](SOCKET s, int backlog) { return listen(s, backlog); };
 	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, int* addrlen) { return accept(s, addr, addrlen); };
 
@@ -360,6 +360,7 @@ namespace kissnet
 			{
 				if(syscall_connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
 				{
+					auto error = WSAGetLastError();
 					kissnet_error("connect failed\n");
 				}
 			}
