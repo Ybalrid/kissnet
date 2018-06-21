@@ -227,11 +227,11 @@ namespace kissnet
 		///OS specific stuff. payload we have to hold onto for RAII management of the Operating System's socket library (e.g. Windows Socket API WinSock2)
 		KISSNET_OS_SPECIFIC;
 
-		///Location where this socket is bound
-		endpoint bind_loc;
-
 		///operatic-system type for a socket object
 		SOCKET sock;
+
+        ///Location where this socket is bound
+		endpoint bind_loc;
 
 		///hostinfo structure
 		hostent* hostinfo = nullptr;

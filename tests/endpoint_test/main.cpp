@@ -30,4 +30,6 @@ int main()
         std::cout << by_string.address << '\n';
         std::cout << by_string.port << '\n';
     }
-};
+
+    return 0;
+}

@@ -6,8 +6,8 @@ int main()
     std::cout << "hello world\n";
 
     //if comoiler crash, theses types doens't exist
-    kissnet::protocol::tcp;
-    kissnet::protocol::udp;
+    (void)kissnet::protocol::tcp;
+    (void)kissnet::protocol::udp;
 
     //give me 2k of memory, please!
     kissnet::buffer<2048> test_buffer;
