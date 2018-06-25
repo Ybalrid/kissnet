@@ -284,6 +284,11 @@ namespace kissnet
 			return *this;
 		}
 
+		bool operator==(const socket& other)
+		{
+			return sock == other.sock;
+		}
+
 		///Construc socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
 		 bind_loc{ bind_to }
@@ -444,7 +449,7 @@ namespace kissnet
 		bytes_with_status recv(buffer<buff_size>& write_buff)
 		{
 
-			auto n = 0;
+			auto n		= 0;
 			bool status = true;
 			if constexpr(sock_proto == protocol::tcp)
 			{
@@ -466,7 +471,7 @@ namespace kissnet
 			{
 				//connection closed by remote? callback?
 			}
-			return {(size_t)(n < 0 ? 0 : n), status};
+			return { (size_t)(n < 0 ? 0 : n), status };
 		}
 
 		///Return the endpoint where this socket is talking to
