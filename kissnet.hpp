@@ -247,9 +247,13 @@ namespace kissnet
 		SOCKADDR sout   = { 0 };
 		socklen_t sout_len;
 
-		socket() = default;
-
 	public:
+		//Construct an invalid socket
+		socket() :
+		 sock{ INVALID_SOCKET }
+		{
+		}
+
 		socket(const socket&) = delete;
 		socket& operator=(const socket&) = delete;
 
@@ -284,9 +288,14 @@ namespace kissnet
 			return *this;
 		}
 
-		bool operator==(const socket& other)
+		bool operator==(const socket& other) const
 		{
 			return sock == other.sock;
+		}
+
+		bool is_valid() const
+		{
+			return sock != INVALID_SOCKET;
 		}
 
 		///Construc socket and (if applicable) connect to the endpoint
@@ -321,26 +330,28 @@ namespace kissnet
 			sock = syscall_socket(familly, type, 0);
 			if(sock == INVALID_SOCKET)
 			{
-				//error here
-				//std::cerr << "invalid socket\n";
+				kissnet_fatal_error("socket() syscall failed!");
 			}
 
 			hostinfo = gethostbyname(bind_loc.address.c_str());
 			if(!hostinfo)
 			{
-				//error here
-				//std::cerr << "hostinfo is null\n";
+				kissnet_fatal_error("gethostbyname failed!")
 			}
 
 			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
 			sin.sin_port   = htons(bind_loc.port);
 			sin.sin_family = familly;
 
-			//ioctl_setting set = 1;
-			//ioctlsocket(sock, FIONBIO, &set);
-
 			//Fill sout with 0s
 			memset((void*)&sout, 0, sizeof sout);
+		}
+
+		void set_non_blocking(bool state = true)
+		{
+			ioctl_setting set = state ? 1 : 0;
+			if(ioctlsocket(sock, FIONBIO, &set) < 0)
+				kissnet_fatal_error("ioctlsocket returned negative when setting nonblock = " + std::to_string(state));
 		}
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
@@ -418,6 +429,9 @@ namespace kissnet
 
 			if((s = syscall_accept(sock, &addr, &size)) == INVALID_SOCKET)
 			{
+				if(get_error_code() == EWOULDBLOCK)
+					return {};
+
 				kissnet_fatal_error("accept() returned an invalid socket\n");
 			}
 
