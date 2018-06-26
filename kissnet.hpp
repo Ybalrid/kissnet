@@ -505,17 +505,17 @@ namespace kissnet
 			return size > 0 ? size : 0;
 		}
 
-        ///Return the protocol used by this socket
-        protocol get_protocol() const
-        {
-            return sock_proto;
-        }
+		///Return the protocol used by this socket
+		protocol get_protocol() const
+		{
+			return sock_proto;
+		}
 	};
 
-    ///Alias for socket<protocol::tcp>
-    using tcp_socket = socket<protocol::tcp>;
-    ///Alias for socket<protocol::udp>
-    using udp_socket = socket<protocol::udp>;
+	///Alias for socket<protocol::tcp>
+	using tcp_socket = socket<protocol::tcp>;
+	///Alias for socket<protocol::udp>
+	using udp_socket = socket<protocol::udp>;
 }
 
 #endif //KISS_NET
