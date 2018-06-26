@@ -76,7 +76,16 @@ namespace kissnet
 
 	int get_error_code()
 	{
-		return WSAGetLastError();
+		const auto error = WSAGetLastError();
+
+		//We need to posixify the values that we are actually using here:
+		switch(error)
+		{
+			case WSAEWOULDBLOCK:
+				return EWOULDBLOCK;
+			default:
+				return error;
+		}
 	}
 }
 #else //UNIX platform
@@ -128,6 +137,7 @@ namespace kissnet
 {
 	using namespace std::string_literals;
 
+	///Exception-less error handling infrastructure
 	namespace error
 	{
 		static void (*callback)(const std::string&, void* ctx) = nullptr;
@@ -156,6 +166,7 @@ namespace kissnet
 	enum class protocol { tcp,
 						  udp };
 
+	///Represent ipv4 vs ipv6
 	enum class ip {
 		v4,
 		v6
@@ -203,6 +214,7 @@ namespace kissnet
 			port	= (port_t)strtoul(addr.substr(separator + 1).c_str(), nullptr, 10);
 		}
 
+		///Construct an endpoint from a SOCKADDR
 		endpoint(SOCKADDR addr)
 		{
 			SOCKADDR_IN ip_addr = *(SOCKADDR_IN*)(&addr);
@@ -212,18 +224,19 @@ namespace kissnet
 	};
 
 	//Wrap "system calls" here to avoid conflicts with the names used in the socket class
-	auto syscall_socket  = [](int af, int type, int protocol) { return socket(af, type, protocol); };
-	auto syscall_recv	= [](SOCKET s, char* buff, buffsize_t len, int flags) { return recv(s, buff, len, flags); };
-	auto syscall_send	= [](SOCKET s, const char* buff, buffsize_t len, int flags) { return send(s, buff, len, flags); };
-	auto syscall_bind	= [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return bind(s, name, namelen); };
-	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return connect(s, name, namelen); };
-	auto syscall_listen  = [](SOCKET s, int backlog) { return listen(s, backlog); };
-	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) { return accept(s, addr, addrlen); };
+	auto syscall_socket  = [](int af, int type, int protocol) { return ::socket(af, type, protocol); };
+	auto syscall_recv	= [](SOCKET s, char* buff, buffsize_t len, int flags) { return ::recv(s, buff, len, flags); };
+	auto syscall_send	= [](SOCKET s, const char* buff, buffsize_t len, int flags) { return ::send(s, buff, len, flags); };
+	auto syscall_bind	= [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return ::bind(s, name, namelen); };
+	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return ::connect(s, name, namelen); };
+	auto syscall_listen  = [](SOCKET s, int backlog) { return ::listen(s, backlog); };
+	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) { return ::accept(s, addr, addrlen); };
 
 	///Class that represent a socket
 	template <protocol sock_proto, ip ipver = ip::v4>
 	class socket
 	{
+		///Struct that represent
 		struct bytes_with_status
 		{
 			size_t bytes;
@@ -248,15 +261,19 @@ namespace kissnet
 		socklen_t sout_len;
 
 	public:
-		//Construct an invalid socket
+		///Construct an invalid socket
 		socket() :
 		 sock{ INVALID_SOCKET }
 		{
 		}
 
+		///socket<> isn't copiable
 		socket(const socket&) = delete;
+
+		///socket<> isn't copiable
 		socket& operator=(const socket&) = delete;
 
+		///Move constructor. socket<> isn't copiable
 		socket(socket&& other)
 		{
 			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
@@ -269,6 +286,7 @@ namespace kissnet
 			other.sock = -1;
 		}
 
+		///Move assign operation
 		socket& operator=(socket&& other)
 		{
 
@@ -288,11 +306,13 @@ namespace kissnet
 			return *this;
 		}
 
+		///Return true if the underlying OS provided socket representation (file descriptor, handle...). Both socket are pointing to the same thing in this case
 		bool operator==(const socket& other) const
 		{
 			return sock == other.sock;
 		}
 
+		///Return true if socket is valid. If this is false, you probably shouldn't attempt to send/receive anything, it will probably explode in your face!
 		bool is_valid() const
 		{
 			return sock != INVALID_SOCKET;
@@ -347,6 +367,8 @@ namespace kissnet
 			memset((void*)&sout, 0, sizeof sout);
 		}
 
+		///Set the socket in non blocking mode
+		/// \param state By default "true". If put to false, it will set the socket back into blocking, normal mode
 		void set_non_blocking(bool state = true)
 		{
 			ioctl_setting set = state ? 1 : 0;
@@ -429,7 +451,7 @@ namespace kissnet
 
 			if((s = syscall_accept(sock, &addr, &size)) == INVALID_SOCKET)
 			{
-				if(get_error_code() == EWOULDBLOCK)
+				if(const auto error = get_error_code(); error == EWOULDBLOCK)
 					return {};
 
 				kissnet_fatal_error("accept() returned an invalid socket\n");
