@@ -63,10 +63,7 @@ int main(int argc, char* argv[])
 			while(ok)
 			{
 				//attept to receive data
-				auto [size, valid] = sock.recv(buff);
-
-				//If socket is still valid
-				if(valid)
+				if(auto [size, valid] = sock.recv(buff); valid)
 				{
 					//no bytes = cleanly disconnected
 					if(size == 0)
@@ -83,8 +80,7 @@ int main(int argc, char* argv[])
 
 			//Now that we are outside the loop, erase this socket from the "sokets" list:
 			std::cout << "detected disconnect\n";
-			auto me_iterator = std::find(sockets.begin(), sockets.end(), std::ref(sock));
-			if(me_iterator != sockets.end())
+			if(auto me_iterator = std::find(sockets.begin(), sockets.end(), std::ref(sock)); me_iterator != sockets.end())
 			{
 				std::cout << "closing socket...\n";
 				sockets.erase(me_iterator);
