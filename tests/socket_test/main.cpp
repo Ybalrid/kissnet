@@ -83,6 +83,43 @@ int main()
 		//Print who send the data
 		std::cout << "From: " << from.address << ' ' << from.port << '\n';
 	}
+    
+    //nonblocking listener
+    {
+        kn::tcp_socket listener(kn::endpoint("0.0.0.0:6666"));
+        listener.set_non_blocking();
+        listener.bind();
+        listener.listen();
+        
+        const char* hello_goodbye = "Hello hello, I don't no why you say GooBye, I say Hello!";
+        const size_t hello_goodbye_size = strlen(hello_goodbye);
+        const std::byte* hello_goodbye_byte = reinterpret_cast<const std::byte*>(hello_goodbye);
+        bool run = true;
+
+        std::thread quit_th([&]{
+                    std::cout << "press return to quit\n";
+                    std::cin.get();
+                    std::cin.clear();
+                    run = false;
+                });
+
+        quit_th.detach();
+
+
+        for(size_t i = 0; run && i < 50; ++i)
+        {
+            std::this_thread::sleep_for(100ms);
+            if(auto socket = listener.accept(); socket.is_valid())
+            {
+                std::cout << "Accepted connect\n";
+                socket.send(hello_goodbye_byte, hello_goodbye_size);
+            }
+            else
+            {
+                std::cout << "No connections to accept...\n";
+            }
+        }
+    }
 
 	//So long, and thanks for all the fish
 	return 0;
