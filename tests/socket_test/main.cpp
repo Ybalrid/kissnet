@@ -10,7 +10,7 @@ int main()
 {
 	{
 		//Create a kissnet tco ipv4 socket
-		kn::socket<kn::protocol::tcp> a_socket(kn::endpoint("avalon.ybalrid.info:80"));
+		kn::tcp_socket a_socket(kn::endpoint("avalon.ybalrid.info:80"));
 		a_socket.connect();
 
 		//Create a "GET /" HTTP request, and send that packet into the socket
@@ -43,10 +43,10 @@ int main()
 
 	{
 		//Socket used to send, the "endpoint" is the destination of the data
-		kn::socket<kn::protocol::udp> a_socket(kn::endpoint("127.0.0.1", 6666));
+		kn::udp_socket a_socket(kn::endpoint("127.0.0.1", 6666));
 
 		//Socket used to receive, the "endpoint" is where to listen to data
-		kn::socket<kn::protocol::udp> b_socket(kn::endpoint("0.0.0.0", 6666));
+		kn::udp_socket b_socket(kn::endpoint("0.0.0.0", 6666));
 		b_socket.bind();
 
 		//Byte buffer

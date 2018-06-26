@@ -21,10 +21,10 @@ int main(int argc, char* argv[])
 	//We need to store thread objects somewhere:
 	std::vector<std::thread> threads;
 	//We need to store socket objects somewhere
-	std::vector<kn::socket<kn::protocol::tcp>> sockets;
+	std::vector<kn::tcp_socket> sockets;
 
 	//Create a listening TCP socket on requested port
-	kn::socket<kn::protocol::tcp> listen_socket({ "0.0.0.0", port });
+	kn::tcp_socket listen_socket({ "0.0.0.0", port });
 	listen_socket.bind();
 	listen_socket.listen();
 
@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 		auto& sock = sockets.back();
 
 		//Create thread that will echo bytes received to the client
-		threads.emplace_back([&](kn::socket<kn::protocol::tcp>& sock) {
+		threads.emplace_back([&](kn::tcp_socket& sock) {
 			//Internal loop
 			bool ok = true;
 			//Static 1k buffer

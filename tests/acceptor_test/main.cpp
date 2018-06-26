@@ -6,7 +6,7 @@ namespace kn = kissnet;
 int main()
 {
 	//setup socket
-	kn::socket<kissnet::protocol::tcp> server(kn::endpoint("0.0.0.0:8080"));
+	kn::tcp_socket server(kn::endpoint("0.0.0.0:8080"));
 	server.bind();
 	server.listen();
 
