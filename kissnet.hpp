@@ -336,7 +336,7 @@ namespace kissnet
 			hostinfo = gethostbyname(bind_loc.address.c_str());
 			if(!hostinfo)
 			{
-				kissnet_fatal_error("gethostbyname failed!")
+				kissnet_fatal_error("gethostbyname failed!");
 			}
 
 			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
