@@ -279,7 +279,7 @@ namespace kissnet
 			sout							 = std::move(other.sout);
 			sout_len						 = std::move(other.sout_len);
 
-			other.sock = -1;
+			other.sock = INVALID_SOCKET;
 		}
 
 		///Move assign operation
