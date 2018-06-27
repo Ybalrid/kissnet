@@ -9,13 +9,12 @@ namespace kn = kissnet;
 
 int main(int argc, char* argv[])
 {
-
 	//Configuration (by default)
 	kn::port_t port = 12321;
 	//If specified : get port from command line
 	if(argc >= 2)
 	{
-		port = (kn::port_t)strtoul(argv[1], nullptr, 10);
+		port = kn::port_t(strtoul(argv[1], nullptr, 10));
 	}
 
 	//We need to store thread objects somewhere:
@@ -53,7 +52,7 @@ int main(int argc, char* argv[])
 		auto& sock = sockets.back();
 
 		//Create thread that will echo bytes received to the client
-		threads.emplace_back([&](kn::tcp_socket& sock) {
+		threads.emplace_back([&]{
 			//Internal loop
 			bool ok = true;
 			//Static 1k buffer
@@ -74,19 +73,19 @@ int main(int argc, char* argv[])
 				//If not valid remote host closed conection
 				else
 				{
-					ok = 0;
+					ok = false;
 				}
 			}
 
 			//Now that we are outside the loop, erase this socket from the "sokets" list:
 			std::cout << "detected disconnect\n";
-			if(auto me_iterator = std::find(sockets.begin(), sockets.end(), std::ref(sock)); me_iterator != sockets.end())
+			if(const auto me_iterator = std::find(sockets.begin(), sockets.end(), std::ref(sock)); me_iterator != sockets.end())
 			{
 				std::cout << "closing socket...\n";
 				sockets.erase(me_iterator);
 			}
-		},
-							 std::ref(sock));
+		});
+
 		threads.back().detach();
 	}
 
