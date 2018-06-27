@@ -236,12 +236,8 @@ namespace kissnet
 	template <protocol sock_proto, ip ipver = ip::v4>
 	class socket
 	{
-		///Struct that represent
-		struct bytes_with_status
-		{
-			size_t bytes;
-			bool no_error;
-		};
+		///Represent a number of bytes with a status information. Some of the methods of this class returns this.
+		using bytes_with_status = std::tuple<size_t, bool>;
 
 		///OS specific stuff. payload we have to hold onto for RAII management of the Operating System's socket library (e.g. Windows Socket API WinSock2)
 		KISSNET_OS_SPECIFIC;
