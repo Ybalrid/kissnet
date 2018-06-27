@@ -32,41 +32,55 @@ using buffsize_t	= int;
 namespace kissnet
 {
 
+	///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
 	struct WSA;
+
+	///Enclose the global pointer in this namespace. Only use this inside a shared_ptr
 	namespace internal_state
 	{
 		static WSA* global_WSA = nullptr;
 	}
 
+	///WSA object
 	struct WSA : std::enable_shared_from_this<WSA>
 	{
+		///data storage
 		WSADATA wsa_data;
+
+		///Stratup
 		WSA()
 		{
 			WSAStartup(MAKEWORD(2, 2), &wsa_data);
 		}
 
+		///Cleanup
 		~WSA()
 		{
 			WSACleanup();
 			internal_state::global_WSA = nullptr;
 		}
 
+		///get the shared pointer
 		std::shared_ptr<WSA> getPtr()
 		{
 			return shared_from_this();
 		}
 	};
 
+	///Get-or-create the global pointer
 	std::shared_ptr<WSA> getWSA()
 	{
+		//If it has been created already:
 		if(internal_state::global_WSA)
-			return internal_state::global_WSA->getPtr();
+			return internal_state::global_WSA->getPtr(); //fetch the smart pointer from the naked pointer
 
-		//Create shared_ptr
+		//Create in wsa
 		auto wsa = std::make_shared<WSA>();
 
+		//Save the raw address in the global state
 		internal_state::global_WSA = wsa.get();
+
+		//Return the smart pointer
 		return wsa;
 	}
 
@@ -74,16 +88,17 @@ namespace kissnet
 #define KISSNET_OS_SPECIFIC std::shared_ptr<kissnet::WSA> KISSNET_OS_SPECIFIC_PAYLOAD_NAME
 #define KISSNET_OS_INIT KISSNET_OS_SPECIFIC_PAYLOAD_NAME = kissnet::getWSA()
 
+	///Return the last error code
 	int get_error_code()
 	{
 		const auto error = WSAGetLastError();
 
-		//We need to posixify the values that we are actually using here:
+		//We need to posixify the values that we are actually using inside this header. 
 		switch(error)
 		{
 			case WSAEWOULDBLOCK:
 				return EWOULDBLOCK;
-			default:
+			default: 
 				return error;
 		}
 	}
@@ -135,7 +150,6 @@ int get_error_code()
 ///Main namespace of kissnet
 namespace kissnet
 {
-	using namespace std::string_literals;
 
 	///Exception-less error handling infrastructure
 	namespace error
@@ -146,15 +160,18 @@ namespace kissnet
 
 		void handler(const std::string& str)
 		{
+			//if the error::callback function has been provided, call that
 			if(callback)
 			{
 				callback(str, ctx);
 			}
+			//Print error into the standard error output
 			else
 			{
 				fputs(str.c_str(), stderr);
 			}
 
+			//If the error abort hasn't been deactivated
 			if(abortOnFatalError)
 			{
 				abort();
@@ -224,13 +241,48 @@ namespace kissnet
 	};
 
 	//Wrap "system calls" here to avoid conflicts with the names used in the socket class
-	auto syscall_socket  = [](int af, int type, int protocol) { return ::socket(af, type, protocol); };
-	auto syscall_recv	= [](SOCKET s, char* buff, buffsize_t len, int flags) { return ::recv(s, buff, len, flags); };
-	auto syscall_send	= [](SOCKET s, const char* buff, buffsize_t len, int flags) { return ::send(s, buff, len, flags); };
-	auto syscall_bind	= [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return ::bind(s, name, namelen); };
-	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) { return ::connect(s, name, namelen); };
-	auto syscall_listen  = [](SOCKET s, int backlog) { return ::listen(s, backlog); };
-	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) { return ::accept(s, addr, addrlen); };
+
+	///socket()
+	auto syscall_socket  = [](int af, int type, int protocol)
+	{
+		return ::socket(af, type, protocol);
+	};
+
+	///recv()
+	auto syscall_recv = [](SOCKET s, char* buff, buffsize_t len, int flags)
+	{
+		return ::recv(s, buff, len, flags);
+	};
+
+	///send()
+	auto syscall_send = [](SOCKET s, const char* buff, buffsize_t len, int flags)
+	{
+		return ::send(s, buff, len, flags);
+	};
+
+	///bind()
+	auto syscall_bind = [](SOCKET s, const struct sockaddr* name, socklen_t namelen)
+	{
+		return ::bind(s, name, namelen);
+	};
+
+	///connect()
+	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen)
+	{
+		return ::connect(s, name, namelen);
+	};
+
+	///listen()
+	auto syscall_listen  = [](SOCKET s, int backlog)
+	{
+		return ::listen(s, backlog);
+	};
+
+	///accept()
+	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen)
+	{
+		return ::accept(s, addr, addrlen);
+	};
 
 	///Represent the status of a socket as returned by a socket operation (send, received). Implictly convertible to bool
 	struct socket_status
@@ -242,11 +294,11 @@ namespace kissnet
 			cleanly_disconnected			= 0x2,
 			non_blocking_would_have_blocked = 0x3
 
-			/* ... any other info on a "still valid socket" goes here .. */
+			/* ... any other info on a "still valid socket" goes here ... */
 
 		};
-		
-		///Actual value of the socket_status. 
+
+		///Actual value of the socket_status.
 		const values value;
 
 		///Use the default constructor
@@ -256,11 +308,14 @@ namespace kissnet
 		socket_status(bool state) :
 		 value((values)(state ? valid : errored)) {}
 
+		///Copy socket status by default
 		socket_status(const socket_status&) = default;
+
+		///Move socket status by default
 		socket_status(socket_status&&)		= default;
 
-
-		operator bool() const
+		///implictly convert this object to const bool (as the status shouldn't change)
+		operator const bool() const
 		{
 			return value != errored;
 		}
@@ -397,15 +452,6 @@ namespace kissnet
 			memset((void*)&sout, 0, sizeof sout);
 		}
 
-		///Set the socket in non blocking mode
-		/// \param state By default "true". If put to false, it will set the socket back into blocking, normal mode
-		void set_non_blocking(bool state = true)
-		{
-			ioctl_setting set = state ? 1 : 0;
-			if(ioctlsocket(sock, FIONBIO, &set) < 0)
-				kissnet_fatal_error("ioctlsocket returned negative when setting nonblock = " + std::to_string(state));
-		}
-
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
 		 sock{ native_sock }, bind_loc(bind_to)
@@ -432,6 +478,18 @@ namespace kissnet
 			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
 			sin.sin_port   = htons(bind_loc.port);
 			sin.sin_family = familly;
+
+			//Fill sout with 0s
+			memset((void*)&sout, 0, sizeof sout);
+		}
+
+		///Set the socket in non blocking mode
+		/// \param state By default "true". If put to false, it will set the socket back into blocking, normal mode
+		void set_non_blocking(bool state = true)
+		{
+			ioctl_setting set = state ? 1 : 0;
+			if(ioctlsocket(sock, FIONBIO, &set) < 0)
+				kissnet_fatal_error("ioctlsocket returned negative when setting nonblock = " + std::to_string(state));
 		}
 
 		///Bind socket locally using hte address and port of the endpoint
@@ -563,7 +621,7 @@ namespace kissnet
 		}
 
 		///Return an endpoint that originated the data in the last recv
-		endpoint get_recv_endpoint()
+		endpoint get_recv_endpoint() const
 		{
 			if constexpr(sock_proto == protocol::tcp)
 				return get_bind_loc;
@@ -574,7 +632,7 @@ namespace kissnet
 		}
 
 		///Return the number of bytes availabe inside the socket
-		size_t bytes_available()
+		size_t bytes_available() const
 		{
 			static ioctl_setting size = 0;
 			auto status				  = ioctlsocket(sock, FIONREAD, &size);
