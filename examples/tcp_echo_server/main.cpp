@@ -9,6 +9,7 @@ namespace kn = kissnet;
 
 int main(int argc, char* argv[])
 {
+
 	//Configuration (by default)
 	kn::port_t port = 12321;
 	//If specified : get port from command line
@@ -54,26 +55,25 @@ int main(int argc, char* argv[])
 		//Create thread that will echo bytes received to the client
 		threads.emplace_back([&]{
 			//Internal loop
-			bool ok = true;
+			bool continue_receiving = true;
 			//Static 1k buffer
 			kn::buffer<1024> buff;
 
 			//While connection is alive
-			while(ok)
+			while(continue_receiving)
 			{
 				//attept to receive data
 				if(auto [size, valid] = sock.recv(buff); valid)
 				{
-					//no bytes = cleanly disconnected
-					if(size == 0)
-						ok = false;
+					if(valid.value == kn::socket_status::cleanly_disconnected)
+						continue_receiving = false;
 					else
 						sock.send(buff.data(), size);
 				}
 				//If not valid remote host closed conection
 				else
 				{
-					ok = false;
+					continue_receiving = false;
 				}
 			}
 

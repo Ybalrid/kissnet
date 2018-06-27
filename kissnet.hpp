@@ -142,7 +142,7 @@ namespace kissnet
 	{
 		static void (*callback)(const std::string&, void* ctx) = nullptr;
 		static void* ctx									   = nullptr;
-		static bool abortOnError							   = true;
+		static bool abortOnFatalError						   = true;
 
 		void handler(const std::string& str)
 		{
@@ -155,7 +155,7 @@ namespace kissnet
 				fputs(str.c_str(), stderr);
 			}
 
-			if(abortOnError)
+			if(abortOnFatalError)
 			{
 				abort();
 			}
@@ -232,12 +232,46 @@ namespace kissnet
 	auto syscall_listen  = [](SOCKET s, int backlog) { return ::listen(s, backlog); };
 	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) { return ::accept(s, addr, addrlen); };
 
+	///Represent the status of a socket as returned by a socket operation (send, received). Implictly convertible to bool
+	struct socket_status
+	{
+		///Enumeration of socket status, with a 1 byte footprint
+		enum values : uint8_t {
+			errored							= 0x0,
+			valid							= 0x1,
+			cleanly_disconnected			= 0x2,
+			non_blocking_would_have_blocked = 0x3
+
+			/* ... any other info on a "still valid socket" goes here .. */
+
+		};
+		
+		///Actual value of the socket_status. 
+		const values value;
+
+		///Use the default constructor
+		socket_status() = default;
+
+		///Construct a "errored/valid" status for a true/false
+		socket_status(bool state) :
+		 value((values)(state ? valid : errored)) {}
+
+		socket_status(const socket_status&) = default;
+		socket_status(socket_status&&)		= default;
+
+
+		operator bool() const
+		{
+			return value != errored;
+		}
+	};
+
 	///Class that represent a socket
 	template <protocol sock_proto, ip ipver = ip::v4>
 	class socket
 	{
 		///Represent a number of bytes with a status information. Some of the methods of this class returns this.
-		using bytes_with_status = std::tuple<size_t, bool>;
+		using bytes_with_status = std::tuple<size_t, socket_status>;
 
 		///OS specific stuff. payload we have to hold onto for RAII management of the Operating System's socket library (e.g. Windows Socket API WinSock2)
 		KISSNET_OS_SPECIFIC;
@@ -458,22 +492,35 @@ namespace kissnet
 		///Close socket on descturction
 		~socket()
 		{
-			if(!(sock < 0))
+			if(!(sock == INVALID_SOCKET))
 				closesocket(sock);
 		}
 
 		///Send some bytes through the pipe
-		size_t send(const std::byte* read_buff, size_t lenght)
+		bytes_with_status send(const std::byte* read_buff, size_t lenght)
 		{
+			int received_bytes;
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				return syscall_send(sock, (const char*)read_buff, (buffsize_t)lenght, 0);
+				received_bytes = syscall_send(sock, (const char*)read_buff, (buffsize_t)lenght, 0);
 			}
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				return sendto(sock, (const char*)read_buff, (buffsize_t)lenght, 0, (SOCKADDR*)&sin, sizeof sin);
+				received_bytes = sendto(sock, (const char*)read_buff, (buffsize_t)lenght, 0, (SOCKADDR*)&sin, sizeof sin);
 			}
+
+			if(received_bytes < 0)
+			{
+				if(get_error_code() == EWOULDBLOCK)
+				{
+					return { 0, socket_status::non_blocking_would_have_blocked };
+				}
+
+				return { 0, socket_status::errored };
+			}
+
+			return { received_bytes, socket_status::valid };
 		}
 
 		///receive bytes inside the buffer, renturn the number of bytes you got
@@ -481,29 +528,32 @@ namespace kissnet
 		bytes_with_status recv(buffer<buff_size>& write_buff)
 		{
 
-			auto n		= 0;
-			bool status = true;
+			auto received_bytes = 0;
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				n = syscall_recv(sock, (char*)write_buff.data(), (buffsize_t)write_buff.size(), 0);
+				received_bytes = syscall_recv(sock, (char*)write_buff.data(), (buffsize_t)buff_size, 0);
 			}
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				sout_len = sizeof sout;
-				n		 = recvfrom(sock, (char*)write_buff.data(), (buffsize_t)write_buff.size(), 0, &sout, &sout_len);
+				sout_len	   = sizeof sout;
+				received_bytes = ::recvfrom(sock, (char*)write_buff.data(), (buffsize_t)buff_size, 0, &sout, &sout_len);
 			}
 
-			if(n < 0)
+			if(received_bytes < 0)
 			{
-				status = false;
+				if(get_error_code() == EWOULDBLOCK)
+					return { 0, socket_status::non_blocking_would_have_blocked };
+
+				return { 0, socket_status::errored };
 			}
 
-			if(n == 0)
+			if(received_bytes == 0)
 			{
-				//connection closed by remote? callback?
+				return { received_bytes, socket_status::cleanly_disconnected };
 			}
-			return { (size_t)(n < 0 ? 0 : n), status };
+
+			return { size_t(received_bytes), true };
 		}
 
 		///Return the endpoint where this socket is talking to

@@ -3,7 +3,7 @@
 
 int main()
 {
-	kissnet::error::abortOnError = false;
+	kissnet::error::abortOnFatalError = false;
 
 	kissnet::error::handler("test what code would be called on error when built without exception\n");
 
