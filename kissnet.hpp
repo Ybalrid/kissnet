@@ -93,12 +93,12 @@ namespace kissnet
 	{
 		const auto error = WSAGetLastError();
 
-		//We need to posixify the values that we are actually using inside this header. 
+		//We need to posixify the values that we are actually using inside this header.
 		switch(error)
 		{
 			case WSAEWOULDBLOCK:
 				return EWOULDBLOCK;
-			default: 
+			default:
 				return error;
 		}
 	}
@@ -243,44 +243,37 @@ namespace kissnet
 	//Wrap "system calls" here to avoid conflicts with the names used in the socket class
 
 	///socket()
-	auto syscall_socket  = [](int af, int type, int protocol)
-	{
+	auto syscall_socket = [](int af, int type, int protocol) {
 		return ::socket(af, type, protocol);
 	};
 
 	///recv()
-	auto syscall_recv = [](SOCKET s, char* buff, buffsize_t len, int flags)
-	{
+	auto syscall_recv = [](SOCKET s, char* buff, buffsize_t len, int flags) {
 		return ::recv(s, buff, len, flags);
 	};
 
 	///send()
-	auto syscall_send = [](SOCKET s, const char* buff, buffsize_t len, int flags)
-	{
+	auto syscall_send = [](SOCKET s, const char* buff, buffsize_t len, int flags) {
 		return ::send(s, buff, len, flags);
 	};
 
 	///bind()
-	auto syscall_bind = [](SOCKET s, const struct sockaddr* name, socklen_t namelen)
-	{
+	auto syscall_bind = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) {
 		return ::bind(s, name, namelen);
 	};
 
 	///connect()
-	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen)
-	{
+	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) {
 		return ::connect(s, name, namelen);
 	};
 
 	///listen()
-	auto syscall_listen  = [](SOCKET s, int backlog)
-	{
+	auto syscall_listen = [](SOCKET s, int backlog) {
 		return ::listen(s, backlog);
 	};
 
 	///accept()
-	auto syscall_accept  = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen)
-	{
+	auto syscall_accept = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) {
 		return ::accept(s, addr, addrlen);
 	};
 
@@ -312,7 +305,7 @@ namespace kissnet
 		socket_status(const socket_status&) = default;
 
 		///Move socket status by default
-		socket_status(socket_status&&)		= default;
+		socket_status(socket_status&&) = default;
 
 		///implictly convert this object to const bool (as the status shouldn't change)
 		operator const bool() const
