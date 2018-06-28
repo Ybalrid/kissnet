@@ -256,11 +256,32 @@ namespace kissnet
 		}
 
 		///Construct an endpoint from a SOCKADDR
-		endpoint(SOCKADDR addr)
+		endpoint(SOCKADDR* addr)
 		{
-			SOCKADDR_IN ip_addr = *(SOCKADDR_IN*)(&addr);
-			address				= inet_ntoa(ip_addr.sin_addr);
-			port				= ip_addr.sin_port;
+			switch(addr->sa_family)
+			{
+				case AF_INET:
+				{
+					auto ip_addr = (SOCKADDR_IN*)(addr);
+					address		 = inet_ntoa(ip_addr->sin_addr);
+					port		 = ip_addr->sin_port;
+				}
+				break;
+
+				case AF_INET6:
+				{
+					auto ip_addr = (sockaddr_in6*)(addr);
+					char buffer[INET6_ADDRSTRLEN];
+					address = inet_ntop(AF_INET6, &(ip_addr->sin6_addr), buffer, INET6_ADDRSTRLEN);
+					port	= ip_addr->sin6_port;
+				}
+				break;
+			}
+
+			if(address.empty())
+			{
+				kissnet_fatal_error("Couldn't construct endpoint from sockaddr(_storage) struct");
+			}
 		}
 	};
 
@@ -354,12 +375,44 @@ namespace kissnet
 		///Location where this socket is bound
 		endpoint bind_loc;
 
-		///hostinfo structure
-		hostent* hostinfo = nullptr;
+		///Address infomation structures
+		addrinfo hints;
+		addrinfo* results = nullptr;
+
+		void initialize_addrinfo(int& type, short& familly)
+		{
+			int iprotocol;
+			if constexpr(sock_proto == protocol::tcp)
+			{
+				type	  = SOCK_STREAM;
+				iprotocol = IPPROTO_TCP;
+			}
+			if constexpr(sock_proto == protocol::udp)
+			{
+				type	  = SOCK_DGRAM;
+				iprotocol = IPPROTO_UDP;
+			}
+
+			if constexpr(ipver == ip::v4)
+			{
+				familly = AF_INET;
+			}
+
+			if constexpr(ipver == ip::v6)
+			{
+				familly = AF_INET6;
+			}
+
+			memset(&hints, 0, sizeof hints);
+			hints.ai_family   = familly;
+			hints.ai_socktype = type;
+			hints.ai_protocol = iprotocol;
+			hints.ai_flags	= AI_ADDRCONFIG;
+		}
 
 		///sockaddr struct
-		SOCKADDR_IN sin = { 0 };
-		SOCKADDR sout   = { 0 };
+		SOCKADDR sin		  = { 0 };
+		sockaddr_storage sout = { 0 };
 		socklen_t sout_len;
 
 	public:
@@ -430,24 +483,7 @@ namespace kissnet
 			//Do we use streams or datagrams
 			int type;
 			short familly;
-			if constexpr(sock_proto == protocol::tcp)
-			{
-				type = SOCK_STREAM;
-			}
-			if constexpr(sock_proto == protocol::udp)
-			{
-				type = SOCK_DGRAM;
-			}
-
-			if constexpr(ipver == ip::v4)
-			{
-				familly = AF_INET;
-			}
-
-			if constexpr(ipver == ip::v6)
-			{
-				familly = AF_INET6;
-			}
+			initialize_addrinfo(type, familly);
 
 			sock = syscall_socket(familly, type, 0);
 			if(sock == INVALID_SOCKET)
@@ -455,15 +491,11 @@ namespace kissnet
 				kissnet_fatal_error("socket() syscall failed!");
 			}
 
-			hostinfo = gethostbyname(bind_loc.address.c_str());
-			if(!hostinfo)
+			if(getaddrinfo(bind_loc.address.c_str(), std::to_string(bind_loc.port).c_str(), &hints, &results) != 0)
 			{
-				kissnet_fatal_error("gethostbyname failed!");
+				const auto error = get_error_code();
+				kissnet_fatal_error("getaddrinfo failed!");
 			}
-
-			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
-			sin.sin_port   = htons(bind_loc.port);
-			sin.sin_family = familly;
 
 			//Fill sout with 0s
 			memset((void*)&sout, 0, sizeof sout);
@@ -473,28 +505,12 @@ namespace kissnet
 		socket(SOCKET native_sock, endpoint bind_to) :
 		 sock{ native_sock }, bind_loc(bind_to)
 		{
+			KISSNET_OS_INIT;
 
 			short familly;
+			int type;
 
-			if constexpr(ipver == ip::v4)
-			{
-				familly = AF_INET;
-			}
-
-			if constexpr(ipver == ip::v6)
-			{
-				familly = AF_INET6;
-			}
-
-			hostinfo = gethostbyname(bind_loc.address.c_str());
-			if(!hostinfo)
-			{
-				kissnet_fatal_error("hostinfo is null\n");
-			}
-
-			sin.sin_addr   = *(IN_ADDR*)hostinfo->h_addr;
-			sin.sin_port   = htons(bind_loc.port);
-			sin.sin_family = familly;
+			initialize_addrinfo(type, familly);
 
 			//Fill sout with 0s
 			memset((void*)&sout, 0, sizeof sout);
@@ -513,8 +529,12 @@ namespace kissnet
 		void bind()
 		{
 
-			if(syscall_bind(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) == SOCKET_ERROR)
+			memcpy(&sin, results->ai_addr, sizeof(SOCKADDR));
+
+			if(syscall_bind(sock, (SOCKADDR*)results->ai_addr, results->ai_addrlen) == SOCKET_ERROR)
 			{
+
+				const auto error = get_error_code();
 				kissnet_fatal_error("bind() failed\n");
 			}
 		}
@@ -524,6 +544,9 @@ namespace kissnet
 		{
 			if constexpr(sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
+
+				memcpy(&sin, results->ai_addr, sizeof(SOCKADDR));
+
 				if(syscall_connect(sock, (SOCKADDR*)&sin, sizeof(SOCKADDR)) != SOCKET_ERROR)
 				{
 					return true;
@@ -562,7 +585,7 @@ namespace kissnet
 				kissnet_fatal_error("accept() returned an invalid socket\n");
 			}
 
-			return { s, endpoint(addr) };
+			return { s, endpoint(&addr) };
 		}
 		///Close socket on descturction
 		~socket()
@@ -582,7 +605,8 @@ namespace kissnet
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				received_bytes = sendto(sock, (const char*)read_buff, (buffsize_t)lenght, 0, (SOCKADDR*)&sin, sizeof sin);
+				memcpy(&sin, results->ai_addr, results->ai_addrlen);
+				received_bytes = sendto(sock, (const char*)read_buff, (buffsize_t)lenght, 0, (SOCKADDR*)results->ai_addr, results->ai_addrlen);
 			}
 
 			if(received_bytes < 0)
@@ -611,8 +635,10 @@ namespace kissnet
 
 			if constexpr(sock_proto == protocol::udp)
 			{
-				sout_len	   = sizeof sout;
-				received_bytes = ::recvfrom(sock, (char*)write_buff.data(), (buffsize_t)buff_size, 0, &sout, &sout_len);
+				sout_len = sizeof sout;
+
+				received_bytes = ::recvfrom(sock, (char*)write_buff.data(), (buffsize_t)buff_size, 0, (sockaddr*)&sout, &sout_len);
+				sout;
 			}
 
 			if(received_bytes < 0)
@@ -644,7 +670,7 @@ namespace kissnet
 				return get_bind_loc;
 			if constexpr(sock_proto == protocol::udp)
 			{
-				return { sout };
+				return { (sockaddr*)&sout };
 			}
 		}
 
@@ -673,6 +699,10 @@ namespace kissnet
 	using tcp_socket = socket<protocol::tcp>;
 	///Alias for socket<protocol::udp>
 	using udp_socket = socket<protocol::udp>;
+	///IPV6 versuion of a tcp socket
+	using tcp_socket_v6 = socket<protocol::tcp, ip::v6>;
+	///IPV6 version of an udp socket
+	using udp_socket_v6 = socket<protocol::udp, ip::v6>;
 }
 
 #endif //KISS_NET
