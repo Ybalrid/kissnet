@@ -493,7 +493,6 @@ namespace kissnet
 
 			if(getaddrinfo(bind_loc.address.c_str(), std::to_string(bind_loc.port).c_str(), &hints, &results) != 0)
 			{
-				const auto error = get_error_code();
 				kissnet_fatal_error("getaddrinfo failed!");
 			}
 
@@ -533,8 +532,6 @@ namespace kissnet
 
 			if(syscall_bind(sock, (SOCKADDR*)results->ai_addr, results->ai_addrlen) == SOCKET_ERROR)
 			{
-
-				const auto error = get_error_code();
 				kissnet_fatal_error("bind() failed\n");
 			}
 		}
@@ -638,7 +635,6 @@ namespace kissnet
 				sout_len = sizeof sout;
 
 				received_bytes = ::recvfrom(sock, (char*)write_buff.data(), (buffsize_t)buff_size, 0, (sockaddr*)&sout, &sout_len);
-				sout;
 			}
 
 			if(received_bytes < 0)
