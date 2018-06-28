@@ -57,7 +57,7 @@ int main()
 			buff[i] = std::byte{ i };
 
 		//Send data
-		a_socket.send(buff.data(), 16);
+		a_socket.send(buff, 16);
 
 		//Same deal as above
 		std::this_thread::sleep_for(1s);

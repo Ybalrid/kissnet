@@ -36,6 +36,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cassert>
 #include <stdexcept>
 #include <string>
 
@@ -589,6 +590,13 @@ namespace kissnet
 		{
 			if(!(sock == INVALID_SOCKET))
 				closesocket(sock);
+		}
+
+		template <size_t buff_size>
+		bytes_with_status send(const buffer<buff_size>& buff, const size_t length = buff_size)
+		{
+			assert(buff_size >= length);
+			return send(buff.data(), length);
 		}
 
 		///Send some bytes through the pipe
