@@ -20,6 +20,68 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
+ * INTRODUCTION
+ * ============
+ *
+ * Kissnet is a simple C++17 layer around the raw OS provided socket API to be used on
+ * IP networks with the TCP and UDP protocols.
+ *
+ * Kissnet is not a networking framework, and it will not process your data or assist you
+ * in any way. Kissnet's only goal is to provide a simple API to send and receive bytes,
+ * without having to play around with a bunch of structure, file descriptors, handles and
+ * pointers given to a C-style API. The other goal of kissnet is to provide an API that will
+ * works in a cross platform setting.
+ *
+ * Kissnet will automatically manage the eventual startup/shutdown of the library needed to
+ * perform socket operations on a particular platform. (e.g. the Windows Socket API on
+ * MS-Windows.
+ *
+ * Kissnet leverages (and expect you to do so), multiple features from C++17, including: std::byte,
+ * if constexpr, structured bindings, if-initializer and template parameter type deduction.
+ *
+ * The library is structured accross 4 exposed data types:
+ *
+ *  - buffer<size_t> : a static array of std::byte implemented via std::array. This is what you should
+ *  use to hold raw data you are getting from a socket, before extracting what you need from the bytes
+ *  - port_t : a 16 bit unsiged number. Represent a network port number
+ *  - endpoint : a structure that represent a location where you need to connect to. Contains a hostname
+ *  (as std::string) and a port number (as port_t)
+ *  - socket<protocol, ip> : a templated class that represent a socket. Protocol is either tcp or udp,
+ *  and ip is either v4 or v6
+ *
+ * Kissnet does error handling in 2 ways:
+ *
+ *  1:
+ *  When an operation can generate an error that the user should handle by hand anyway, a tuple
+ *  containing the expected type returned, and an object that represent the status of what happend
+ *  is returned.
+ *
+ *  For example, socket send/receive operation can discover that the connexion was closed, or was shutted down properly.
+ *  It could also be the fact that a socket was configured "non blocking" and would have blocked in this situation.
+ *  On both occasion, these methods will return the fact that 0 bytes came accross as the transaction size, and the status will
+ *  indicate either an error (socket no longer valid), or an actual status message (connexion closed, socket would
+ *  have blocked)
+ *
+ *  These status objects will behave like a const bool that equals "false" when an error occured, and "true" when it's just a
+ *  status notification
+ *
+ *  2:
+ *  Fatal errors are by default handled by throwing a runtime_error exception. But, for many reasons, you may want to
+ *  not use exceptions entirely.
+ *
+ *  kissnet give you some facilities to get fatal errors informations back, and to choose how to handle it. Kissnet give
+ *  you a few levers you can use:
+ *
+ *  - You can deactivate the exception support by #defining KISSNET_NO_EXCEP before #including kissnet.hpp. Insteand, kissnet will use a function based error handler
+ *  - By default, the error handler prints to stderr the error message, and abort the program
+ *  - kissnet::error::callback is a function pointer that gets a string, and a context pointer. The string is the error message, and the context pointer
+ * what ever you gived kissnet for the occasion. This is a global pointer that you can set as you want. This will override the "print to stderr" behavior at fatal error time.
+ *  - kissnet::error::ctx is a void*, this will be passed to your error handler as a "context" pointer. If you need your handler to write to a log, or to turn on the HTCPCP enabled teapot on John's desk, you can.
+ *  - kissnet::abortOnFatalError is a boolean that will control the call to abort(). This is independent to the fact that you did set or not an error callback.
+ * please note that any object involved with the operation that triggered the fatal error is probably in an invalid state, and probably deserve to be thrown away.
+ *
+ *
  */
 
 #ifndef KISS_NET
@@ -57,6 +119,8 @@ using buffsize_t	= int;
 namespace kissnet
 {
 
+	namespace win32_specifc
+	{
 	///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
 	struct WSA;
 
@@ -109,9 +173,11 @@ namespace kissnet
 		return wsa;
 	}
 
+	}
+
 #define KISSNET_OS_SPECIFIC_PAYLOAD_NAME wsa_ptr
-#define KISSNET_OS_SPECIFIC std::shared_ptr<kissnet::WSA> KISSNET_OS_SPECIFIC_PAYLOAD_NAME
-#define KISSNET_OS_INIT KISSNET_OS_SPECIFIC_PAYLOAD_NAME = kissnet::getWSA()
+#define KISSNET_OS_SPECIFIC std::shared_ptr<kissnet::win32_specific::WSA> KISSNET_OS_SPECIFIC_PAYLOAD_NAME
+#define KISSNET_OS_INIT KISSNET_OS_SPECIFIC_PAYLOAD_NAME = kissnet::win32_specific::getWSA()
 
 	///Return the last error code
 	int get_error_code()
@@ -164,6 +230,11 @@ int ioctlsocket(int fd, int request, Params&&... params)
 #define KISSNET_OS_SPECIFIC_PAYLOAD_NAME dummy
 #define KISSNET_OS_SPECIFIC char dummy
 #define KISSNET_OS_INIT dummy = 42;
+
+namespace unix_specific
+{
+
+}
 
 int get_error_code()
 {
