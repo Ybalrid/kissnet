@@ -87,6 +87,7 @@
 #ifndef KISS_NET
 #define KISS_NET
 
+///Define this to not use exceptions
 #ifndef KISSNET_NO_EXCEP
 #define kissnet_fatal_error(STR) throw std::runtime_error(STR)
 #else
@@ -119,7 +120,7 @@ using buffsize_t	= int;
 namespace kissnet
 {
 
-	namespace win32_specifc
+	namespace win32_specific
 	{
 	///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
 	struct WSA;
@@ -483,7 +484,7 @@ namespace kissnet
 		}
 
 		///sockaddr struct
-		SOCKADDR sin		  = { 0 };
+		sockaddr_storage sin  = { 0 };
 		sockaddr_storage sout = { 0 };
 		socklen_t sout_len;
 
