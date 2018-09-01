@@ -19,6 +19,16 @@ Wrap all annoying C api calls to the OS inside a `socket` template class
 * Manage required library (e.g. WinSock2) initialization and cleanup for you RAII style. Network is de-initialized when last socket object goes out of scope
 * Use familiar names for socket operations as methods: `send`, `recv`, `connect`, `bind`, `listen`, `accept`...
 
+## Supported platforms:
+
+kissnet was desinged to be a slingle API for using low level tcp and udp sockets on any platform where you can run a  modern C++ compiler. Kissnet currently supports
+
+- Windows (via the WSA/WinSock2 libraries)
+- Linux
+- FreeBSD
+
+kissnet should probably work "as is" on other UNIX platform.
+
 ## Short docs
 
 *Volontary contrived examples showing how the library looks like:*
