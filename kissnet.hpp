@@ -204,6 +204,7 @@ namespace kissnet
 #include <netinet/in.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <errno.h>
 
 using ioctl_setting = int;
 using buffsize_t	= size_t;
