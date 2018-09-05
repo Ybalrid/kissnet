@@ -1,4 +1,4 @@
-# kissnet [![Total alerts](https://img.shields.io/lgtm/alerts/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/alerts/) [![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/context:cpp) 
+# kissnet [![Build status](https://ci.appveyor.com/api/projects/status/rcay95ld21m7o8sv/branch/master?svg=true)](https://ci.appveyor.com/project/Ybalrid/kissnet/branch/master) [![Total alerts](https://img.shields.io/lgtm/alerts/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/alerts/) [![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/context:cpp) 
 
 **K**eep **I**t **S**imple **S**tupid **NET**work.
 
