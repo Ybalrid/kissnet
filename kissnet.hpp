@@ -427,7 +427,7 @@ namespace kissnet
 		socket_status(socket_status&&) = default;
 
 		///implictly convert this object to const bool (as the status shouldn't change)
-		operator const bool() const
+		operator bool() const
 		{
 			return value != errored;
 		}
