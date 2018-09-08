@@ -40,30 +40,30 @@
  * Kissnet leverages (and expect you to do so), multiple features from C++17, including: std::byte,
  * if constexpr, structured bindings, if-initializer and template parameter type deduction.
  *
- * The library is structured accross 4 exposed data types:
+ * The library is structured across 4 exposed data types:
  *
  *  - buffer<size_t> : a static array of std::byte implemented via std::array. This is what you should
  *  use to hold raw data you are getting from a socket, before extracting what you need from the bytes
- *  - port_t : a 16 bit unsiged number. Represent a network port number
+ *  - port_t : a 16 bit unsigned number. Represent a network port number
  *  - endpoint : a structure that represent a location where you need to connect to. Contains a hostname
  *  (as std::string) and a port number (as port_t)
- *  - socket<protocol, ip> : a templated class that represent a socket. Protocol is either tcp or udp,
+ *  - socket<protocol, ip> : a templated class that represent a socket. Protocol is either TCP or UDP,
  *  and ip is either v4 or v6
  *
  * Kissnet does error handling in 2 ways:
  *
  *  1:
  *  When an operation can generate an error that the user should handle by hand anyway, a tuple
- *  containing the expected type returned, and an object that represent the status of what happend
+ *  containing the expected type returned, and an object that represent the status of what happens
  *  is returned.
  *
- *  For example, socket send/receive operation can discover that the connexion was closed, or was shutted down properly.
+ *  For example, socket send/receive operation can discover that the connexion was closed, or was shut down properly.
  *  It could also be the fact that a socket was configured "non blocking" and would have blocked in this situation.
- *  On both occasion, these methods will return the fact that 0 bytes came accross as the transaction size, and the status will
+ *  On both occasion, these methods will return the fact that 0 bytes came across as the transaction size, and the status will
  *  indicate either an error (socket no longer valid), or an actual status message (connexion closed, socket would
  *  have blocked)
  *
- *  These status objects will behave like a const bool that equals "false" when an error occured, and "true" when it's just a
+ *  These status objects will behave like a const bool that equals "false" when an error occurred, and "true" when it's just a
  *  status notification
  *
  *  2:
@@ -76,7 +76,7 @@
  *  - You can deactivate the exception support by #defining KISSNET_NO_EXCEP before #including kissnet.hpp. Insteand, kissnet will use a function based error handler
  *  - By default, the error handler prints to stderr the error message, and abort the program
  *  - kissnet::error::callback is a function pointer that gets a string, and a context pointer. The string is the error message, and the context pointer
- * what ever you gived kissnet for the occasion. This is a global pointer that you can set as you want. This will override the "print to stderr" behavior at fatal error time.
+ * what ever you gave kissnet for the occasion. This is a global pointer that you can set as you want. This will override the "print to stderr" behavior at fatal error time.
  *  - kissnet::error::ctx is a void*, this will be passed to your error handler as a "context" pointer. If you need your handler to write to a log, or to turn on the HTCPCP enabled teapot on John's desk, you can.
  *  - kissnet::abortOnFatalError is a boolean that will control the call to abort(). This is independent to the fact that you did set or not an error callback.
  * please note that any object involved with the operation that triggered the fatal error is probably in an invalid state, and probably deserve to be thrown away.
@@ -115,75 +115,74 @@
 using ioctl_setting = u_long;
 using buffsize_t	= int;
 
-//Handle WinSock2/Windows Socket API initialziation and cleanup
+//Handle WinSock2/Windows Socket API initialization and cleanup
 #pragma comment(lib, "Ws2_32.lib")
 namespace kissnet
 {
 
 	namespace win32_specific
 	{
-	///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
-	struct WSA;
+		///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
+		struct WSA;
 
-	///Enclose the global pointer in this namespace. Only use this inside a shared_ptr
-	namespace internal_state
-	{
-		static WSA* global_WSA = nullptr;
-	}
-
-	///WSA object. Only to be constructed with std::make_shared()
-	struct WSA : std::enable_shared_from_this<WSA>
-	{
-		//For safety, only initialize Windows Socket API once, and delete it once
-		///Prevent copy construct
-		WSA(const WSA&) = delete;
-		///Prevent copy assignment
-		WSA& operator=(const WSA&) = delete;
-		///Prevent moving
-		WSA(WSA&&) = delete;
-		///Prevemnt move assignment
-		WSA& operator=(WSA &&) = delete;
-
-		///data storage
-		WSADATA wsa_data;
-
-		///Stratup
-		WSA()
+		///Enclose the global pointer in this namespace. Only use this inside a shared_ptr
+		namespace internal_state
 		{
-			WSAStartup(MAKEWORD(2, 2), &wsa_data);
+			static WSA* global_WSA = nullptr;
 		}
 
-		///Cleanup
-		~WSA()
+		///WSA object. Only to be constructed with std::make_shared()
+		struct WSA : std::enable_shared_from_this<WSA>
 		{
-			WSACleanup();
-			internal_state::global_WSA = nullptr;
-		}
+			//For safety, only initialize Windows Socket API once, and delete it once
+			///Prevent copy construct
+			WSA(const WSA&) = delete;
+			///Prevent copy assignment
+			WSA& operator=(const WSA&) = delete;
+			///Prevent moving
+			WSA(WSA&&) = delete;
+			///Prevent move assignment
+			WSA& operator=(WSA&&) = delete;
 
-		///get the shared pointer
-		std::shared_ptr<WSA> getPtr()
+			///data storage
+			WSADATA wsa_data;
+
+			///Startup
+			WSA()
+			{
+				WSAStartup(MAKEWORD(2, 2), &wsa_data);
+			}
+
+			///Cleanup
+			~WSA()
+			{
+				WSACleanup();
+				internal_state::global_WSA = nullptr;
+			}
+
+			///get the shared pointer
+			std::shared_ptr<WSA> getPtr()
+			{
+				return shared_from_this();
+			}
+		};
+
+		///Get-or-create the global pointer
+		std::shared_ptr<WSA> getWSA()
 		{
-			return shared_from_this();
+			//If it has been created already:
+			if(internal_state::global_WSA)
+				return internal_state::global_WSA->getPtr(); //fetch the smart pointer from the naked pointer
+
+			//Create in wsa
+			auto wsa = std::make_shared<WSA>();
+
+			//Save the raw address in the global state
+			internal_state::global_WSA = wsa.get();
+
+			//Return the smart pointer
+			return wsa;
 		}
-
-	};
-
-	///Get-or-create the global pointer
-	std::shared_ptr<WSA> getWSA()
-	{
-		//If it has been created already:
-		if(internal_state::global_WSA)
-			return internal_state::global_WSA->getPtr(); //fetch the smart pointer from the naked pointer
-
-		//Create in wsa
-		auto wsa = std::make_shared<WSA>();
-
-		//Save the raw address in the global state
-		internal_state::global_WSA = wsa.get();
-
-		//Return the smart pointer
-		return wsa;
-	}
 
 	}
 
@@ -220,7 +219,7 @@ namespace kissnet
 using ioctl_setting = int;
 using buffsize_t	= size_t;
 
-//To get consistant socket API between Windows and Linux:
+//To get consistent socket API between Windows and Linux:
 static const int INVALID_SOCKET = -1;
 static const int SOCKET_ERROR   = -1;
 using SOCKET					= int;
@@ -309,17 +308,17 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address{};
+		std::string address {};
 
 		///The port to connect to
-		port_t port{};
+		port_t port {};
 
-		///Default constructor, the endpoitn is not valid at that point, but you can set the address/port manually
+		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-		 address{ addr }, port{ prt }
+		 address { addr }, port { prt }
 		{}
 
 		///Construct the endpoint from "address:port"
@@ -407,7 +406,7 @@ namespace kissnet
 		return ::accept(s, addr, addrlen);
 	};
 
-	///Represent the status of a socket as returned by a socket operation (send, received). Implictly convertible to bool
+	///Represent the status of a socket as returned by a socket operation (send, received). Implicitly convertible to bool
 	struct socket_status
 	{
 		///Enumeration of socket status, with a 1 byte footprint
@@ -437,7 +436,7 @@ namespace kissnet
 		///Move socket status by default
 		socket_status(socket_status&&) = default;
 
-		///implictly convert this object to const bool (as the status shouldn't change)
+		///implicitly convert this object to const bool (as the status shouldn't change)
 		operator bool() const
 		{
 			return value != errored;
@@ -460,7 +459,7 @@ namespace kissnet
 		///Location where this socket is bound
 		endpoint bind_loc;
 
-		///Address infomation structures
+		///Address information structures
 		addrinfo hints;
 		addrinfo* results = nullptr;
 
@@ -503,17 +502,17 @@ namespace kissnet
 	public:
 		///Construct an invalid socket
 		socket() :
-		 sock{ INVALID_SOCKET }
+		 sock { INVALID_SOCKET }
 		{
 		}
 
-		///socket<> isn't copiable
+		///socket<> isn't copyable
 		socket(const socket&) = delete;
 
-		///socket<> isn't copiable
+		///socket<> isn't copyable
 		socket& operator=(const socket&) = delete;
 
-		///Move constructor. socket<> isn't copiable
+		///Move constructor. socket<> isn't copyable
 		socket(socket&& other)
 		{
 			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
@@ -558,9 +557,9 @@ namespace kissnet
 			return sock != INVALID_SOCKET;
 		}
 
-		///Construc socket and (if applicable) connect to the endpoint
+		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-		 bind_loc{ bind_to }
+		 bind_loc { bind_to }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -587,7 +586,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-		 sock{ native_sock }, bind_loc(bind_to)
+		 sock { native_sock }, bind_loc(bind_to)
 		{
 			KISSNET_OS_INIT;
 
@@ -606,10 +605,10 @@ namespace kissnet
 		{
 			ioctl_setting set = state ? 1 : 0;
 			if(ioctlsocket(sock, FIONBIO, &set) < 0)
-				kissnet_fatal_error("ioctlsocket returned negative when setting nonblock = " + std::to_string(state));
+				kissnet_fatal_error("ioctlsocket returned negative when setting nonblocking = " + std::to_string(state));
 		}
 
-		///Bind socket locally using hte address and port of the endpoint
+		///Bind socket locally using the address and port of the endpoint
 		void bind()
 		{
 
@@ -649,7 +648,7 @@ namespace kissnet
 			}
 		}
 
-		///(for TCP) Wait for incomming connection, return socket connect to the client. Blocking.
+		///(for TCP) Wait for incoming connection, return socket connect to the client. Blocking.
 		socket accept()
 		{
 			if constexpr(sock_proto != protocol::tcp)
@@ -669,7 +668,7 @@ namespace kissnet
 
 			return { s, endpoint(&addr) };
 		}
-		///Close socket on descturction
+		///Close socket on destruction
 		~socket()
 		{
 			if(!(sock == INVALID_SOCKET))
@@ -711,7 +710,7 @@ namespace kissnet
 			return { received_bytes, socket_status::valid };
 		}
 
-		///receive bytes inside the buffer, renturn the number of bytes you got
+		///receive bytes inside the buffer, return the number of bytes you got
 		template <size_t buff_size>
 		bytes_with_status recv(buffer<buff_size>& write_buff)
 		{
@@ -762,7 +761,7 @@ namespace kissnet
 			}
 		}
 
-		///Return the number of bytes availabe inside the socket
+		///Return the number of bytes available inside the socket
 		size_t bytes_available() const
 		{
 			static ioctl_setting size = 0;
@@ -770,7 +769,7 @@ namespace kissnet
 
 			if(status < 0)
 			{
-				kissnet_fatal_error("ioctlsocket status is negative when geting FIONREAD\n");
+				kissnet_fatal_error("ioctlsocket status is negative when getting FIONREAD\n");
 			}
 
 			return size > 0 ? size : 0;
@@ -787,9 +786,9 @@ namespace kissnet
 	using tcp_socket = socket<protocol::tcp>;
 	///Alias for socket<protocol::udp>
 	using udp_socket = socket<protocol::udp>;
-	///IPV6 versuion of a tcp socket
+	///IPV6 version of a TCP socket
 	using tcp_socket_v6 = socket<protocol::tcp, ip::v6>;
-	///IPV6 version of an udp socket
+	///IPV6 version of an UDP socket
 	using udp_socket_v6 = socket<protocol::udp, ip::v6>;
 }
 
