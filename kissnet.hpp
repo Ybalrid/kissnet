@@ -411,7 +411,7 @@ namespace kissnet
 	struct socket_status
 	{
 		///Enumeration of socket status, with a 1 byte footprint
-		enum values : uint8_t {
+		enum values : int8_t {
 			errored							= 0x0,
 			valid							= 0x1,
 			cleanly_disconnected			= 0x2,
@@ -429,7 +429,7 @@ namespace kissnet
 
 		///Construct a "errored/valid" status for a true/false
 		socket_status(bool state) :
-		 value((values)(state ? valid : errored)) {}
+		 value((values)(state > 0 ? valid : errored)) {}
 
 		///Copy socket status by default
 		socket_status(const socket_status&) = default;
