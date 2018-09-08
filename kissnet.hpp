@@ -428,7 +428,7 @@ namespace kissnet
 
 		///Construct a "errored/valid" status for a true/false
 		socket_status(bool state) :
-		 value((values)(state > 0 ? valid : errored)) {}
+		 value((values)(state ? valid : errored)) {}
 
 		///Copy socket status by default
 		socket_status(const socket_status&) = default;
@@ -439,7 +439,7 @@ namespace kissnet
 		///implicitly convert this object to const bool (as the status shouldn't change)
 		operator bool() const
 		{
-			return value != errored;
+			return value > 0;
 		}
 	};
 
