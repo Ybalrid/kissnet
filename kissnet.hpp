@@ -309,17 +309,17 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address {};
+		std::string address{};
 
 		///The port to connect to
-		port_t port {};
+		port_t port{};
 
 		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-		 address { addr }, port { prt }
+		 address{ addr }, port{ prt }
 		{}
 
 		///Construct the endpoint from "address:port"
@@ -503,7 +503,7 @@ namespace kissnet
 	public:
 		///Construct an invalid socket
 		socket() :
-		 sock { INVALID_SOCKET }
+		 sock{ INVALID_SOCKET }
 		{
 		}
 
@@ -560,7 +560,7 @@ namespace kissnet
 
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-		 bind_loc { bind_to }
+		 bind_loc{ bind_to }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -587,7 +587,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-		 sock { native_sock }, bind_loc(bind_to)
+		 sock{ native_sock }, bind_loc(bind_to)
 		{
 			KISSNET_OS_INIT;
 
@@ -746,16 +746,16 @@ namespace kissnet
 		}
 
 		///Return the endpoint where this socket is talking to
-		endpoint get_bind_loc() const
+		inline endpoint get_bind_loc() const
 		{
 			return bind_loc;
 		}
 
 		///Return an endpoint that originated the data in the last recv
-		endpoint get_recv_endpoint() const
+		inline endpoint get_recv_endpoint() const
 		{
 			if constexpr(sock_proto == protocol::tcp)
-				return get_bind_loc;
+				return get_bind_loc();
 			if constexpr(sock_proto == protocol::udp)
 			{
 				return { (sockaddr*)&sout };
@@ -787,9 +787,9 @@ namespace kissnet
 	using tcp_socket = socket<protocol::tcp>;
 	///Alias for socket<protocol::udp>
 	using udp_socket = socket<protocol::udp>;
-	///IPV6 version of a TCP socket
+	///IPV6 version of a tcp socket
 	using tcp_socket_v6 = socket<protocol::tcp, ip::v6>;
-	///IPV6 version of an UDP socket
+	///IPV6 version of an udp socket
 	using udp_socket_v6 = socket<protocol::udp, ip::v6>;
 }
 
