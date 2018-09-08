@@ -131,9 +131,19 @@ namespace kissnet
 		static WSA* global_WSA = nullptr;
 	}
 
-	///WSA object
+	///WSA object. Only to be constructed with std::make_shared()
 	struct WSA : std::enable_shared_from_this<WSA>
 	{
+		//For safety, only initialize Windows Socket API once, and delete it once
+		///Prevent copy construct
+		WSA(const WSA&) = delete;
+		///Prevent copy assignment
+		WSA& operator=(const WSA&) = delete;
+		///Prevent moving
+		WSA(WSA&&) = delete;
+		///Prevemnt move assignment
+		WSA& operator=(WSA &&) = delete;
+
 		///data storage
 		WSADATA wsa_data;
 
@@ -155,6 +165,7 @@ namespace kissnet
 		{
 			return shared_from_this();
 		}
+
 	};
 
 	///Get-or-create the global pointer
