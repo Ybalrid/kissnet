@@ -122,67 +122,68 @@ namespace kissnet
 
 	namespace win32_specific
 	{
-		///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
-		struct WSA;
+	///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
+	struct WSA;
 
-		///Enclose the global pointer in this namespace. Only use this inside a shared_ptr
-		namespace internal_state
+	///Enclose the global pointer in this namespace. Only use this inside a shared_ptr
+	namespace internal_state
+	{
+		static WSA* global_WSA = nullptr;
+	}
+
+	///WSA object. Only to be constructed with std::make_shared()
+	struct WSA : std::enable_shared_from_this<WSA>
+	{
+		//For safety, only initialize Windows Socket API once, and delete it once
+		///Prevent copy construct
+		WSA(const WSA&) = delete;
+		///Prevent copy assignment
+		WSA& operator=(const WSA&) = delete;
+		///Prevent moving
+		WSA(WSA&&) = delete;
+		///Prevent move assignment
+		WSA& operator=(WSA &&) = delete;
+
+		///data storage
+		WSADATA wsa_data;
+
+		///Startup
+		WSA()
 		{
-			static WSA* global_WSA = nullptr;
+			WSAStartup(MAKEWORD(2, 2), &wsa_data);
 		}
 
-		///WSA object. Only to be constructed with std::make_shared()
-		struct WSA : std::enable_shared_from_this<WSA>
+		///Cleanup
+		~WSA()
 		{
-			//For safety, only initialize Windows Socket API once, and delete it once
-			///Prevent copy construct
-			WSA(const WSA&) = delete;
-			///Prevent copy assignment
-			WSA& operator=(const WSA&) = delete;
-			///Prevent moving
-			WSA(WSA&&) = delete;
-			///Prevent move assignment
-			WSA& operator=(WSA&&) = delete;
-
-			///data storage
-			WSADATA wsa_data;
-
-			///Startup
-			WSA()
-			{
-				WSAStartup(MAKEWORD(2, 2), &wsa_data);
-			}
-
-			///Cleanup
-			~WSA()
-			{
-				WSACleanup();
-				internal_state::global_WSA = nullptr;
-			}
-
-			///get the shared pointer
-			std::shared_ptr<WSA> getPtr()
-			{
-				return shared_from_this();
-			}
-		};
-
-		///Get-or-create the global pointer
-		std::shared_ptr<WSA> getWSA()
-		{
-			//If it has been created already:
-			if(internal_state::global_WSA)
-				return internal_state::global_WSA->getPtr(); //fetch the smart pointer from the naked pointer
-
-			//Create in wsa
-			auto wsa = std::make_shared<WSA>();
-
-			//Save the raw address in the global state
-			internal_state::global_WSA = wsa.get();
-
-			//Return the smart pointer
-			return wsa;
+			WSACleanup();
+			internal_state::global_WSA = nullptr;
 		}
+
+		///get the shared pointer
+		std::shared_ptr<WSA> getPtr()
+		{
+			return shared_from_this();
+		}
+
+	};
+
+	///Get-or-create the global pointer
+	std::shared_ptr<WSA> getWSA()
+	{
+		//If it has been created already:
+		if(internal_state::global_WSA)
+			return internal_state::global_WSA->getPtr(); //fetch the smart pointer from the naked pointer
+
+		//Create in wsa
+		auto wsa = std::make_shared<WSA>();
+
+		//Save the raw address in the global state
+		internal_state::global_WSA = wsa.get();
+
+		//Return the smart pointer
+		return wsa;
+	}
 
 	}
 
