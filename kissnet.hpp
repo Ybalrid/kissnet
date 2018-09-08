@@ -122,68 +122,67 @@ namespace kissnet
 
 	namespace win32_specific
 	{
-	///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
-	struct WSA;
+		///Forward declare the object that will permit to manage the WSAStartup/Cleanup automatically
+		struct WSA;
 
-	///Enclose the global pointer in this namespace. Only use this inside a shared_ptr
-	namespace internal_state
-	{
-		static WSA* global_WSA = nullptr;
-	}
-
-	///WSA object. Only to be constructed with std::make_shared()
-	struct WSA : std::enable_shared_from_this<WSA>
-	{
-		//For safety, only initialize Windows Socket API once, and delete it once
-		///Prevent copy construct
-		WSA(const WSA&) = delete;
-		///Prevent copy assignment
-		WSA& operator=(const WSA&) = delete;
-		///Prevent moving
-		WSA(WSA&&) = delete;
-		///Prevent move assignment
-		WSA& operator=(WSA &&) = delete;
-
-		///data storage
-		WSADATA wsa_data;
-
-		///Startup
-		WSA()
+		///Enclose the global pointer in this namespace. Only use this inside a shared_ptr
+		namespace internal_state
 		{
-			WSAStartup(MAKEWORD(2, 2), &wsa_data);
+			static WSA* global_WSA = nullptr;
 		}
 
-		///Cleanup
-		~WSA()
+		///WSA object. Only to be constructed with std::make_shared()
+		struct WSA : std::enable_shared_from_this<WSA>
 		{
-			WSACleanup();
-			internal_state::global_WSA = nullptr;
-		}
+			//For safety, only initialize Windows Socket API once, and delete it once
+			///Prevent copy construct
+			WSA(const WSA&) = delete;
+			///Prevent copy assignment
+			WSA& operator=(const WSA&) = delete;
+			///Prevent moving
+			WSA(WSA&&) = delete;
+			///Prevent move assignment
+			WSA& operator=(WSA&&) = delete;
 
-		///get the shared pointer
-		std::shared_ptr<WSA> getPtr()
+			///data storage
+			WSADATA wsa_data;
+
+			///Startup
+			WSA()
+			{
+				WSAStartup(MAKEWORD(2, 2), &wsa_data);
+			}
+
+			///Cleanup
+			~WSA()
+			{
+				WSACleanup();
+				internal_state::global_WSA = nullptr;
+			}
+
+			///get the shared pointer
+			std::shared_ptr<WSA> getPtr()
+			{
+				return shared_from_this();
+			}
+		};
+
+		///Get-or-create the global pointer
+		std::shared_ptr<WSA> getWSA()
 		{
-			return shared_from_this();
+			//If it has been created already:
+			if(internal_state::global_WSA)
+				return internal_state::global_WSA->getPtr(); //fetch the smart pointer from the naked pointer
+
+			//Create in wsa
+			auto wsa = std::make_shared<WSA>();
+
+			//Save the raw address in the global state
+			internal_state::global_WSA = wsa.get();
+
+			//Return the smart pointer
+			return wsa;
 		}
-
-	};
-
-	///Get-or-create the global pointer
-	std::shared_ptr<WSA> getWSA()
-	{
-		//If it has been created already:
-		if(internal_state::global_WSA)
-			return internal_state::global_WSA->getPtr(); //fetch the smart pointer from the naked pointer
-
-		//Create in wsa
-		auto wsa = std::make_shared<WSA>();
-
-		//Save the raw address in the global state
-		internal_state::global_WSA = wsa.get();
-
-		//Return the smart pointer
-		return wsa;
-	}
 
 	}
 
@@ -309,17 +308,17 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address{};
+		std::string address {};
 
 		///The port to connect to
-		port_t port{};
+		port_t port {};
 
 		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-		 address{ addr }, port{ prt }
+		 address { addr }, port { prt }
 		{}
 
 		///Construct the endpoint from "address:port"
@@ -503,7 +502,7 @@ namespace kissnet
 	public:
 		///Construct an invalid socket
 		socket() :
-		 sock{ INVALID_SOCKET }
+		 sock { INVALID_SOCKET }
 		{
 		}
 
@@ -560,7 +559,7 @@ namespace kissnet
 
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-		 bind_loc{ bind_to }
+		 bind_loc { bind_to }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -587,7 +586,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-		 sock{ native_sock }, bind_loc(bind_to)
+		 sock { native_sock }, bind_loc(bind_to)
 		{
 			KISSNET_OS_INIT;
 
@@ -792,5 +791,11 @@ namespace kissnet
 	///IPV6 version of an udp socket
 	using udp_socket_v6 = socket<protocol::udp, ip::v6>;
 }
+
+//cleanup preprocessor macros
+#undef KISSNET_OS_SPECIFIC_PAYLOAD_NAME
+#undef KISSNET_OS_SPECIFIC
+#undef KISSNET_OS_INIT
+#undef kissnet_fatal_error
 
 #endif //KISS_NET
