@@ -615,7 +615,7 @@ namespace kissnet
 
 			memcpy(&sin, results->ai_addr, sizeof(SOCKADDR));
 
-			if(syscall_bind(sock, (SOCKADDR*)results->ai_addr, results->ai_addrlen) == SOCKET_ERROR)
+			if(syscall_bind(sock, (SOCKADDR*)results->ai_addr, socklen_t(results->ai_addrlen)) == SOCKET_ERROR)
 			{
 				kissnet_fatal_error("bind() failed\n");
 			}
@@ -695,7 +695,7 @@ namespace kissnet
 			if constexpr(sock_proto == protocol::udp)
 			{
 				memcpy(&sin, results->ai_addr, results->ai_addrlen);
-				received_bytes = sendto(sock, (const char*)read_buff, (buffsize_t)lenght, 0, (SOCKADDR*)results->ai_addr, results->ai_addrlen);
+				received_bytes = sendto(sock, (const char*)read_buff, (buffsize_t)lenght, 0, (SOCKADDR*)results->ai_addr, socklen_t(results->ai_addrlen));
 			}
 
 			if(received_bytes < 0)
