@@ -2,6 +2,7 @@
 #include <thread>
 #include <chrono>
 
+#define KISSNET_WSA_DEBUG
 #include <kissnet.hpp>
 using namespace std::chrono_literals;
 namespace kn = kissnet;
@@ -9,12 +10,12 @@ namespace kn = kissnet;
 int main()
 {
 	{
-		//Create a kissnet tco ipv4 socket
+		//Create a kissnet TCP ipv4 socket
 		kn::tcp_socket a_socket(kn::endpoint("avalon.ybalrid.info:80"));
 		a_socket.connect();
 
 		//Create a "GET /" HTTP request, and send that packet into the socket
-		auto get_index_request = std::string{ "GET / HTTP/1.1\r\nHost: avalon.ybalird.info\r\n\r\n" };
+		auto get_index_request = std::string { "GET / HTTP/1.1\r\nHost: avalon.ybalrid.info\r\n\r\n" };
 
 		//Send request
 		a_socket.send(reinterpret_cast<const std::byte*>(get_index_request.c_str()), get_index_request.size());
@@ -33,13 +34,13 @@ int main()
 
 		//To print it as a good old C string, add a null terminator
 		if(data_size < static_buffer.size())
-			static_buffer[data_size] = std::byte{ '\0' };
+			static_buffer[data_size] = std::byte { '\0' };
 
 		//Print the raw data as text into the terminal (should display html/css code here)
 		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
 	}
 
-	/*No more socket here, this will actually close WSA on Windows*/
+	std::cerr << "Every socket object used here has gone out of scope, Thanks to RAII, this will actually close WSA on Windows\n";
 
 	{
 		//Socket used to send, the "endpoint" is the destination of the data
@@ -54,7 +55,7 @@ int main()
 
 		//Build data to send (flat array of bytes
 		for(unsigned char i = 0; i < 16; i++)
-			buff[i] = std::byte{ i };
+			buff[i] = std::byte { i };
 
 		//Send data
 		a_socket.send(buff, 16);
@@ -83,43 +84,46 @@ int main()
 		//Print who send the data
 		std::cout << "From: " << from.address << ' ' << from.port << '\n';
 	}
-    
-    //nonblocking listener
-    {
-        kn::tcp_socket listener(kn::endpoint("0.0.0.0:6666"));
-        listener.set_non_blocking();
-        listener.bind();
-        listener.listen();
-        
-        const char* hello_goodbye = "Hello hello, I don't no why you say GooBye, I say Hello!";
-        const size_t hello_goodbye_size = strlen(hello_goodbye);
-        const std::byte* hello_goodbye_byte = reinterpret_cast<const std::byte*>(hello_goodbye);
-        bool run = true;
 
-        std::thread quit_th([&]{
-                    std::cout << "press return to quit\n";
-                    std::cin.get();
-                    std::cin.clear();
-                    run = false;
-                });
+	std::cerr << "Every socket object used here has gone out of scope, Thanks to RAII, this will actually close WSA on Windows\n";
 
-        quit_th.detach();
+	//nonblocking listener
+	{
+		kn::tcp_socket listener(kn::endpoint("0.0.0.0:6666"));
+		listener.set_non_blocking();
+		listener.bind();
+		listener.listen();
 
+		const char* hello_goodbye			= "Hello hello, I don't no why you say GooBye, I say Hello!";
+		const size_t hello_goodbye_size		= strlen(hello_goodbye);
+		const std::byte* hello_goodbye_byte = reinterpret_cast<const std::byte*>(hello_goodbye);
+		bool run							= true;
 
-        for(size_t i = 0; run && i < 50; ++i)
-        {
-            std::this_thread::sleep_for(100ms);
-            if(auto socket = listener.accept(); socket.is_valid())
-            {
-                std::cout << "Accepted connect\n";
-                socket.send(hello_goodbye_byte, hello_goodbye_size);
-            }
-            else
-            {
-                std::cout << "No connections to accept...\n";
-            }
-        }
-    }
+		std::thread quit_th([&] {
+			std::cout << "press return to quit\n";
+			std::cin.get();
+			std::cin.clear();
+			run = false;
+		});
+
+		quit_th.detach();
+
+		for(size_t i = 0; run && i < 50; ++i)
+		{
+			std::this_thread::sleep_for(100ms);
+			if(auto socket = listener.accept(); socket.is_valid())
+			{
+				std::cout << "Accepted connect\n";
+				socket.send(hello_goodbye_byte, hello_goodbye_size);
+			}
+			else
+			{
+				std::cout << "No connections to accept...\n";
+			}
+		}
+	}
+
+	std::cerr << "Every socket object used here has gone out of scope, Thanks to RAII, this will actually close WSA on Windows\n";
 
 	//So long, and thanks for all the fish
 	return 0;
