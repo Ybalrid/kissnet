@@ -81,7 +81,6 @@
  *  - kissnet::abortOnFatalError is a boolean that will control the call to abort(). This is independent to the fact that you did set or not an error callback.
  * please note that any object involved with the operation that triggered the fatal error is probably in an invalid state, and probably deserve to be thrown away.
  *
- *
  */
 
 #ifndef KISS_NET
@@ -102,6 +101,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #ifdef _WIN32
 
@@ -190,7 +190,6 @@ namespace kissnet
 			//Return the smart pointer
 			return wsa;
 		}
-
 	}
 
 #define KISSNET_OS_SPECIFIC_PAYLOAD_NAME wsa_ptr
@@ -252,7 +251,6 @@ int ioctlsocket(int fd, int request, Params&&... params)
 
 namespace unix_specific
 {
-
 }
 
 int get_error_code()
@@ -315,35 +313,48 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address {};
+		std::string address{};
 
 		///The port to connect to
-		port_t port {};
+		port_t port{};
 
 		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-		 address { addr }, port { prt }
+		 address{ std::move(addr) }, port{ prt }
 		{}
+
+		static bool is_valid_port_number(unsigned long n)
+		{
+			return n < 1 << 16;
+		}
 
 		///Construct the endpoint from "address:port"
 		endpoint(std::string addr)
 		{
 			const auto separator = addr.find_last_of(':');
+
+			//Check if input wasn't missformed
 			if(separator == std::string::npos)
-			{
-				//error here
-			}
-
+				kissnet_fatal_error("string is not of address:port form");
 			if(separator == addr.size() - 1)
-			{
-				//error here
-			}
+				kissnet_fatal_error("string has ':' as last character. Expected port number here");
 
+			//Isolate address
 			address = addr.substr(0, separator);
-			port	= (port_t)strtoul(addr.substr(separator + 1).c_str(), nullptr, 10);
+
+			//Read from string as unsigned
+			const auto parsed_port = strtoul(addr.substr(separator + 1).c_str(), nullptr, 10);
+
+			//In all other cases, port was always given as a port_t type, strongly preventing it to be a number outside of the [0; 65535] range. Here it's not the case.
+			//To detect errors early, check it here :
+			if(!is_valid_port_number(parsed_port))
+				kissnet_fatal_error("Invalid port number " + std::to_string(parsed_port));
+
+			//Store it
+			port = static_cast<port_t>(parsed_port);
 		}
 
 		///Construct an endpoint from a SOCKADDR
@@ -367,49 +378,52 @@ namespace kissnet
 					port	= ip_addr->sin6_port;
 				}
 				break;
+
+				default:
+				{
+					kissnet_fatal_error("Trying to construct an endpoint for a protocol familly that is neither AF_INET or AF_INET6");
+				}
 			}
 
 			if(address.empty())
-			{
 				kissnet_fatal_error("Couldn't construct endpoint from sockaddr(_storage) struct");
-			}
 		}
 	};
 
 	//Wrap "system calls" here to avoid conflicts with the names used in the socket class
 
 	///socket()
-	auto syscall_socket = [](int af, int type, int protocol) {
+	inline auto syscall_socket = [](int af, int type, int protocol) {
 		return ::socket(af, type, protocol);
 	};
 
 	///recv()
-	auto syscall_recv = [](SOCKET s, char* buff, buffsize_t len, int flags) {
+	inline auto syscall_recv = [](SOCKET s, char* buff, buffsize_t len, int flags) {
 		return ::recv(s, buff, len, flags);
 	};
 
 	///send()
-	auto syscall_send = [](SOCKET s, const char* buff, buffsize_t len, int flags) {
+	inline auto syscall_send = [](SOCKET s, const char* buff, buffsize_t len, int flags) {
 		return ::send(s, buff, len, flags);
 	};
 
 	///bind()
-	auto syscall_bind = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) {
+	inline auto syscall_bind = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) {
 		return ::bind(s, name, namelen);
 	};
 
 	///connect()
-	auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) {
+	inline auto syscall_connect = [](SOCKET s, const struct sockaddr* name, socklen_t namelen) {
 		return ::connect(s, name, namelen);
 	};
 
 	///listen()
-	auto syscall_listen = [](SOCKET s, int backlog) {
+	inline auto syscall_listen = [](SOCKET s, int backlog) {
 		return ::listen(s, backlog);
 	};
 
 	///accept()
-	auto syscall_accept = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) {
+	inline auto syscall_accept = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) {
 		return ::accept(s, addr, addrlen);
 	};
 
@@ -432,7 +446,7 @@ namespace kissnet
 
 		///Use the default constructor
 		socket_status() :
-		 value{errored}{}
+		 value{ errored } {}
 
 		///Construct a "errored/valid" status for a true/false
 		socket_status(bool state) :
@@ -468,10 +482,10 @@ namespace kissnet
 		endpoint bind_loc;
 
 		///Address information structures
-		addrinfo hints;
-		addrinfo* results = nullptr;
+		addrinfo getaddrinfo_hints{};
+		addrinfo* getaddrinfo_results = nullptr;
 
-		void initialize_addrinfo(int& type, short& familly)
+		void initialize_addrinfo(int& type, short& family)
 		{
 			int iprotocol{};
 			if constexpr(sock_proto == protocol::tcp)
@@ -488,30 +502,32 @@ namespace kissnet
 
 			if constexpr(ipver == ip::v4)
 			{
-				familly = AF_INET;
+				family = AF_INET;
 			}
 
 			else if constexpr(ipver == ip::v6)
 			{
-				familly = AF_INET6;
+				family = AF_INET6;
 			}
 
-			(void)memset(&hints, 0, sizeof hints);
-			hints.ai_family   = familly;
-			hints.ai_socktype = type;
-			hints.ai_protocol = iprotocol;
-			hints.ai_flags	= AI_ADDRCONFIG;
+			(void)memset(&getaddrinfo_hints, 0, sizeof getaddrinfo_hints);
+			getaddrinfo_hints.ai_family   = family;
+			getaddrinfo_hints.ai_socktype = type;
+			getaddrinfo_hints.ai_protocol = iprotocol;
+			getaddrinfo_hints.ai_flags	= AI_ADDRCONFIG;
 		}
 
 		///sockaddr struct
-		sockaddr_storage socket_output  = { 0 };
-		sockaddr_storage socket_input = { 0 };
-		socklen_t socket_input_socklen;
+		sockaddr_storage socket_output = {};
+		sockaddr_storage socket_input  = {};
+		socklen_t socket_input_socklen{};
 
 	public:
 		///Construct an invalid socket
 		socket() :
-		 sock { INVALID_SOCKET }
+		 sock{ INVALID_SOCKET },
+		 getaddrinfo_hints(),
+		 socket_input_socklen(0)
 		{
 		}
 
@@ -522,14 +538,15 @@ namespace kissnet
 		socket& operator=(const socket&) = delete;
 
 		///Move constructor. socket<> isn't copyable
-		socket(socket&& other) noexcept: hints()
+		socket(socket&& other) noexcept :
+		 getaddrinfo_hints()
 		{
 			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
-			bind_loc                         = std::move(other.bind_loc);
-			sock                             = std::move(other.sock);
-			socket_output                    = std::move(other.socket_output);
-			socket_input                     = std::move(other.socket_input);
-			socket_input_socklen             = std::move(other.socket_input_socklen);
+			bind_loc						 = std::move(other.bind_loc);
+			sock							 = std::move(other.sock);
+			socket_output					 = std::move(other.socket_output);
+			socket_input					 = std::move(other.socket_input);
+			socket_input_socklen			 = std::move(other.socket_input_socklen);
 
 			other.sock = INVALID_SOCKET;
 		}
@@ -547,9 +564,9 @@ namespace kissnet
 				KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
 				bind_loc						 = std::move(other.bind_loc);
 				sock							 = std::move(other.sock);
-				socket_output								 = std::move(other.socket_output);
-				socket_input							 = std::move(other.socket_input);
-				socket_input_socklen						 = std::move(other.socket_input_socklen);
+				socket_output					 = std::move(other.socket_output);
+				socket_input					 = std::move(other.socket_input);
+				socket_input_socklen			 = std::move(other.socket_input_socklen);
 			}
 			return *this;
 		}
@@ -568,7 +585,7 @@ namespace kissnet
 
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-		 bind_loc { bind_to }
+		 bind_loc{ std::move(bind_to) }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -584,8 +601,9 @@ namespace kissnet
 				kissnet_fatal_error("socket() syscall failed!");
 			}
 
-			if(getaddrinfo(bind_loc.address.c_str(), std::to_string(bind_loc.port).c_str(), &hints, &results) != 0)
+			if(getaddrinfo(bind_loc.address.c_str(), std::to_string(bind_loc.port).c_str(), &getaddrinfo_hints, &getaddrinfo_results) != 0)
 			{
+				//TODO There can be more than one adress to attempt to use in the getaddrinfo_results (It's a list). Try to go further down that list in error condition
 				kissnet_fatal_error("getaddrinfo failed!");
 			}
 
@@ -595,7 +613,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-		 sock { native_sock }, bind_loc(bind_to)
+		 sock{ native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints{}
 		{
 			KISSNET_OS_INIT;
 
@@ -621,9 +639,9 @@ namespace kissnet
 		void bind()
 		{
 
-			memcpy(&socket_output, results->ai_addr, sizeof(SOCKADDR));
+			memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
 
-			if(syscall_bind(sock, static_cast<SOCKADDR*>(results->ai_addr), socklen_t(results->ai_addrlen)) == SOCKET_ERROR)
+			if(syscall_bind(sock, static_cast<SOCKADDR*>(getaddrinfo_results->ai_addr), socklen_t(getaddrinfo_results->ai_addrlen)) == SOCKET_ERROR)
 			{
 				kissnet_fatal_error("bind() failed\n");
 			}
@@ -635,13 +653,9 @@ namespace kissnet
 			if constexpr(sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
 
-				memcpy(&socket_output, results->ai_addr, sizeof(SOCKADDR));
+				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
 
-				if(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR)
-				{
-					return true;
-				}
-				return false;
+				return static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR);
 			}
 		}
 
@@ -660,13 +674,16 @@ namespace kissnet
 		///(for TCP) Wait for incoming connection, return socket connect to the client. Blocking.
 		socket accept()
 		{
-			if constexpr(sock_proto != protocol::tcp) return { INVALID_SOCKET, {} };
+			if constexpr(sock_proto != protocol::tcp)
+			{
+				return { INVALID_SOCKET, {} };
+			}
 
-			SOCKADDR addr;
-			SOCKET s	   = INVALID_SOCKET;
-			socklen_t size = sizeof addr;
+			SOCKADDR socket_address;
+			SOCKET s;
+			socklen_t size = sizeof socket_address;
 
-			if((s = syscall_accept(sock, &addr, &size)) == INVALID_SOCKET)
+			if((s = syscall_accept(sock, &socket_address, &size)) == INVALID_SOCKET)
 			{
 				if(const auto error = get_error_code(); error == EWOULDBLOCK)
 					return {};
@@ -674,8 +691,9 @@ namespace kissnet
 				kissnet_fatal_error("accept() returned an invalid socket\n");
 			}
 
-			return { s, endpoint(&addr) };
+			return { s, endpoint(&socket_address) };
 		}
+
 		///Close socket on destruction
 		~socket()
 		{
@@ -693,7 +711,7 @@ namespace kissnet
 		///Send some bytes through the pipe
 		bytes_with_status send(const std::byte* read_buff, size_t length)
 		{
-			int received_bytes{0};
+			auto received_bytes{ 0 };
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
@@ -701,8 +719,8 @@ namespace kissnet
 
 			else if constexpr(sock_proto == protocol::udp)
 			{
-				memcpy(&socket_output, results->ai_addr, results->ai_addrlen);
-				received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, static_cast<SOCKADDR*>(results->ai_addr), socklen_t(results->ai_addrlen));
+				memcpy(&socket_output, getaddrinfo_results->ai_addr, getaddrinfo_results->ai_addrlen);
+				received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, static_cast<SOCKADDR*>(getaddrinfo_results->ai_addr), socklen_t(getaddrinfo_results->ai_addrlen));
 			}
 
 			if(received_bytes < 0)
@@ -729,7 +747,7 @@ namespace kissnet
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(write_buff.data()), static_cast<buffsize_t>(buff_size), 0);
 			}
 
-			if constexpr(sock_proto == protocol::udp)
+			else if constexpr(sock_proto == protocol::udp)
 			{
 				socket_input_socklen = sizeof socket_input;
 
@@ -753,16 +771,19 @@ namespace kissnet
 		}
 
 		///Return the endpoint where this socket is talking to
-		inline endpoint get_bind_loc() const
+		endpoint get_bind_loc() const
 		{
 			return bind_loc;
 		}
 
 		///Return an endpoint that originated the data in the last recv
-		inline endpoint get_recv_endpoint() const
+		endpoint get_recv_endpoint() const
 		{
-			if constexpr(sock_proto == protocol::tcp) return get_bind_loc();
-			else if constexpr(sock_proto == protocol::udp)
+			if constexpr(sock_proto == protocol::tcp)
+			{
+				return get_bind_loc();
+			}
+			if constexpr(sock_proto == protocol::udp)
 			{
 				return { (sockaddr*)&socket_input };
 			}
@@ -772,7 +793,7 @@ namespace kissnet
 		size_t bytes_available() const
 		{
 			static ioctl_setting size = 0;
-			const auto status				  = ioctlsocket(sock, FIONREAD, &size);
+			const auto status		  = ioctlsocket(sock, FIONREAD, &size);
 
 			if(status < 0)
 			{
@@ -793,9 +814,9 @@ namespace kissnet
 	using tcp_socket = socket<protocol::tcp>;
 	///Alias for socket<protocol::udp>
 	using udp_socket = socket<protocol::udp>;
-	///IPV6 version of a tcp socket
+	///IPV6 version of a TCP socket
 	using tcp_socket_v6 = socket<protocol::tcp, ip::v6>;
-	///IPV6 version of an udp socket
+	///IPV6 version of an UDP socket
 	using udp_socket_v6 = socket<protocol::udp, ip::v6>;
 }
 
