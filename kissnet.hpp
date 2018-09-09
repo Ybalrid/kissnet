@@ -221,6 +221,7 @@ namespace kissnet
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 using ioctl_setting = int;
 using buffsize_t	= size_t;
@@ -630,9 +631,15 @@ namespace kissnet
 		/// \param state By default "true". If put to false, it will set the socket back into blocking, normal mode
 		void set_non_blocking(bool state = true) const
 		{
+#ifdef _WIN32
 			ioctl_setting set = state ? 1 : 0;
 			if(ioctlsocket(sock, FIONBIO, &set) < 0)
-				kissnet_fatal_error("ioctlsocket returned negative when setting nonblocking = " + std::to_string(state));
+#else
+			const auto flags	= fcntl(sock, F_GETFL, 0);
+			const auto newflags = state ? flags | O_NONBLOCK : flags ^ O_NONBLOCK;
+			if(fcntl(sock, F_SETFL, newflags) < 0)
+#endif
+				kissnet_fatal_error("setting socket to nonblock returned an error");
 		}
 
 		///Bind socket locally using the address and port of the endpoint
