@@ -584,6 +584,11 @@ namespace kissnet
 			return sock != INVALID_SOCKET;
 		}
 
+		inline operator bool() const
+		{
+			return is_valid();
+		}
+
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
 		 bind_loc{ std::move(bind_to) }
