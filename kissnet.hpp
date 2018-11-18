@@ -206,6 +206,10 @@ namespace kissnet
 		{
 			case WSAEWOULDBLOCK:
 				return EWOULDBLOCK;
+			case WSAEBADF:
+				return EBADF;
+			case WSAEINTR:
+				return EINTR;
 			default:
 				return error;
 		}
@@ -697,8 +701,14 @@ namespace kissnet
 
 			if((s = syscall_accept(sock, &socket_address, &size)) == INVALID_SOCKET)
 			{
-				if(const auto error = get_error_code(); error == EWOULDBLOCK)
+
+				const auto error = get_error_code();
+				switch (error)
+				{
+				case EWOULDBLOCK: //if socket "would have blocked" from the call, ignore
+				case EINTR: //if blocking call got interrupted, ignore;
 					return {};
+				}
 
 				kissnet_fatal_error("accept() returned an invalid socket\n");
 			}
@@ -706,11 +716,19 @@ namespace kissnet
 			return { s, endpoint(&socket_address) };
 		}
 
-		///Close socket on destruction
-		~socket()
+
+		void close()
 		{
 			if(!(sock == INVALID_SOCKET))
 				closesocket(sock);
+
+			sock = INVALID_SOCKET;
+		}
+
+		///Close socket on destruction
+		~socket()
+		{
+			close();
 		}
 
 		template <size_t buff_size>
