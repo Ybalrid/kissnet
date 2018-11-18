@@ -572,6 +572,8 @@ namespace kissnet
 				socket_output					 = std::move(other.socket_output);
 				socket_input					 = std::move(other.socket_input);
 				socket_input_socklen			 = std::move(other.socket_input_socklen);
+
+				other.sock = INVALID_SOCKET;
 			}
 			return *this;
 		}
