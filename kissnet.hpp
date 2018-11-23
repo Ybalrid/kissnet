@@ -371,7 +371,7 @@ namespace kissnet
 				{
 					auto ip_addr = (SOCKADDR_IN*)(addr);
 					address		 = inet_ntoa(ip_addr->sin_addr);
-					port		 = ip_addr->sin_port;
+					port		 = ntohs(ip_addr->sin_port);
 				}
 				break;
 
@@ -380,7 +380,7 @@ namespace kissnet
 					auto ip_addr = (sockaddr_in6*)(addr);
 					char buffer[INET6_ADDRSTRLEN];
 					address = inet_ntop(AF_INET6, &(ip_addr->sin6_addr), buffer, INET6_ADDRSTRLEN);
-					port	= ip_addr->sin6_port;
+					port	= ntohs(ip_addr->sin6_port);
 				}
 				break;
 
