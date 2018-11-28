@@ -149,7 +149,7 @@ namespace kissnet
 
 			///Startup
 			WSA() :
-			 wsa_data{}
+			 wsa_data {}
 			{
 				WSAStartup(MAKEWORD(2, 2), &wsa_data);
 #ifdef KISSNET_WSA_DEBUG
@@ -318,17 +318,17 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address{};
+		std::string address {};
 
 		///The port to connect to
-		port_t port{};
+		port_t port {};
 
 		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-		 address{ std::move(addr) }, port{ prt }
+		 address { std::move(addr) }, port { prt }
 		{}
 
 		static bool is_valid_port_number(unsigned long n)
@@ -451,7 +451,7 @@ namespace kissnet
 
 		///Use the default constructor
 		socket_status() :
-		 value{ errored } {}
+		 value { errored } {}
 
 		///Construct a "errored/valid" status for a true/false
 		socket_status(bool state) :
@@ -466,6 +466,7 @@ namespace kissnet
 		///implicitly convert this object to const bool (as the status shouldn't change)
 		operator bool() const
 		{
+			//See the above enum: every value <= 0 correspound to an error, and will return false. Every value > 0 returns true
 			return value > 0;
 		}
 	};
@@ -487,12 +488,12 @@ namespace kissnet
 		endpoint bind_loc;
 
 		///Address information structures
-		addrinfo getaddrinfo_hints{};
+		addrinfo getaddrinfo_hints {};
 		addrinfo* getaddrinfo_results = nullptr;
 
 		void initialize_addrinfo(int& type, short& family)
 		{
-			int iprotocol{};
+			int iprotocol {};
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				type	  = SOCK_STREAM;
@@ -525,12 +526,12 @@ namespace kissnet
 		///sockaddr struct
 		sockaddr_storage socket_output = {};
 		sockaddr_storage socket_input  = {};
-		socklen_t socket_input_socklen{};
+		socklen_t socket_input_socklen {};
 
 	public:
 		///Construct an invalid socket
 		socket() :
-		 sock{ INVALID_SOCKET },
+		 sock { INVALID_SOCKET },
 		 getaddrinfo_hints(),
 		 socket_input_socklen(0)
 		{
@@ -597,7 +598,7 @@ namespace kissnet
 
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-		 bind_loc{ std::move(bind_to) }
+		 bind_loc { std::move(bind_to) }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -625,7 +626,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-		 sock{ native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints{}
+		 sock { native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints {}
 		{
 			KISSNET_OS_INIT;
 
@@ -705,11 +706,11 @@ namespace kissnet
 			{
 
 				const auto error = get_error_code();
-				switch (error)
+				switch(error)
 				{
-				case EWOULDBLOCK: //if socket "would have blocked" from the call, ignore
-				case EINTR: //if blocking call got interrupted, ignore;
-					return {};
+					case EWOULDBLOCK: //if socket "would have blocked" from the call, ignore
+					case EINTR:		  //if blocking call got interrupted, ignore;
+						return {};
 				}
 
 				kissnet_fatal_error("accept() returned an invalid socket\n");
@@ -717,7 +718,6 @@ namespace kissnet
 
 			return { s, endpoint(&socket_address) };
 		}
-
 
 		void close()
 		{
@@ -743,7 +743,7 @@ namespace kissnet
 		///Send some bytes through the pipe
 		bytes_with_status send(const std::byte* read_buff, size_t length)
 		{
-			auto received_bytes{ 0 };
+			auto received_bytes { 0 };
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
