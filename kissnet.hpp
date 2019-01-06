@@ -553,6 +553,7 @@ namespace kissnet
 			socket_output					 = std::move(other.socket_output);
 			socket_input					 = std::move(other.socket_input);
 			socket_input_socklen			 = std::move(other.socket_input_socklen);
+			getaddrinfo_results				 = std::move(other.getaddrinfo_results);
 
 			other.sock = INVALID_SOCKET;
 		}
@@ -564,7 +565,7 @@ namespace kissnet
 			if(this != &other)
 			{
 
-				if(!(sock < 0))
+				if(!(sock < 0) || sock != INVALID_SOCKET)
 					closesocket(sock);
 
 				KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
@@ -573,6 +574,7 @@ namespace kissnet
 				socket_output					 = std::move(other.socket_output);
 				socket_input					 = std::move(other.socket_input);
 				socket_input_socklen			 = std::move(other.socket_input_socklen);
+				getaddrinfo_results				 = std::move(other.getaddrinfo_results);
 
 				other.sock = INVALID_SOCKET;
 			}
