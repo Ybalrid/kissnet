@@ -239,13 +239,13 @@ using SOCKADDR					= sockaddr;
 using IN_ADDR					= in_addr;
 
 //Wrap them in their WIN32 names
-int closesocket(SOCKET in)
+inline int closesocket(SOCKET in)
 {
 	return close(in);
 }
 
 template <typename... Params>
-int ioctlsocket(int fd, int request, Params&&... params)
+inline int ioctlsocket(int fd, int request, Params&&... params)
 {
 	return ioctl(fd, request, params...);
 }
