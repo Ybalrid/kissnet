@@ -258,7 +258,7 @@ namespace unix_specific
 {
 }
 
-int get_error_code()
+inline int get_error_code()
 {
 	return errno;
 }
