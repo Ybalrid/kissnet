@@ -790,7 +790,8 @@ namespace kissnet
 
 			if(received_bytes < 0)
 			{
-				if(get_error_code() == EWOULDBLOCK)
+				if(get_error_code() == EWOULDBLOCK
+						|| get_error_code() == EAGAIN)
 					return { 0, socket_status::non_blocking_would_have_blocked };
 
 				return { 0, socket_status::errored };
