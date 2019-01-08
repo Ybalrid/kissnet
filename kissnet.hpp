@@ -454,8 +454,11 @@ namespace kissnet
 		 value { errored } {}
 
 		///Construct a "errored/valid" status for a true/false
-		socket_status(bool state) :
+		explicit socket_status(bool state) :
 		 value(values(state ? valid : errored)) {}
+
+		socket_status(values v) :
+		 value(v) {}
 
 		///Copy socket status by default
 		socket_status(const socket_status&) = default;
@@ -468,6 +471,16 @@ namespace kissnet
 		{
 			//See the above enum: every value <= 0 correspound to an error, and will return false. Every value > 0 returns true
 			return value > 0;
+		}
+
+		int8_t get_value()
+		{
+			return value;
+		}
+
+		bool operator==(values v)
+		{
+			return v == value;
 		}
 	};
 
@@ -790,10 +803,11 @@ namespace kissnet
 
 			if(received_bytes < 0)
 			{
-				if(get_error_code() == EWOULDBLOCK
-						|| get_error_code() == EAGAIN)
+				const auto error = get_error_code();
+				if(error == EWOULDBLOCK)
 					return { 0, socket_status::non_blocking_would_have_blocked };
-
+				if(error == EAGAIN)
+					return {0, socket_status::non_blocking_would_have_blocked};
 				return { 0, socket_status::errored };
 			}
 
@@ -802,7 +816,7 @@ namespace kissnet
 				return { received_bytes, socket_status::cleanly_disconnected };
 			}
 
-			return { size_t(received_bytes), true };
+			return { size_t(received_bytes), socket_status::valid };
 		}
 
 		///Return the endpoint where this socket is talking to
