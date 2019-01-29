@@ -69,7 +69,7 @@ int main()
 		std::cout << "bytes available to read : " << a_socket.bytes_available() << '\n';
 
 		//Get the data, and the lengh of data
-		const auto data_size = a_socket.recv(static_buffer);
+		const auto [data_size, status_code] = a_socket.recv(static_buffer);
 
 		//To print it as a good old C string, add a null terminator
 		if(data_size < static_buffer.size())
@@ -109,7 +109,7 @@ int main()
 		std::cout << "avaliable in UDP socket : " << b_socket.bytes_available() << " bytes\n";
 
 		//You receive in the same way
-		b_socket.recv(recv_buff);
+		auto [received_bytes, status] = b_socket.recv(recv_buff);
 		const auto from = b_socket.get_recv_endpoint();
 
 		//Print the data
@@ -150,7 +150,7 @@ int main()
 
 	//Read once in a 1k buffer
 	kn::buffer<1024> buff;
-	const auto size = client.recv(buff);
+	const auto [size, status] = client.recv(buff);
 
 	//Add null terminator, and print as string
 	if(size < buff.size()) buff[size] = std::byte{ 0 };
