@@ -26,6 +26,7 @@ kissnet was desinged to be a slingle API for using low level tcp and udp sockets
 - Windows (via the WSA/WinSock2 libraries)
 - Linux
 - FreeBSD
+- Haiku OS (needs to be linked to libnetwork. either use `target_link_libraries(target network)` with cmake, or -lnetwork in yoru compile command), networking will use the posix headers shiped with the OS, not the BeOS-like C++ network kit.
 
 kissnet should probably work "as is" on other UNIX platform.
 
