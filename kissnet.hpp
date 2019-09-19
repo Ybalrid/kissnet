@@ -292,7 +292,7 @@ namespace kissnet
 		static void* ctx									   = nullptr;
 		static bool abortOnFatalError						   = true;
 
-		inline void handler(const std::string& str)
+		inline void handle(const std::string& str)
 		{
 			//if the error::callback function has been provided, call that
 			if(callback)

@@ -2,6 +2,8 @@
 
 **K**eep **I**t **S**imple **S**tupid **NET**work.
 
+The thought that led me to write this thing are better explained in [this article](https://blog.ybalrid.info/2018/12/no-nonsense-networking-for-c-introducing-kissnet-a-k-i-s-s-socket-library/)
+
 A lightweight, header only, crossplatform C++17 socket library.
 
 Wrap all annoying C api calls to the OS inside a `socket` template class
