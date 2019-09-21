@@ -123,13 +123,44 @@
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
+
+#ifndef NOMINMAX
 #define NOMINMAX
-#include <windows.h>
+#endif
+
 #include <winsock2.h>
+#include <windows.h>
 #include <ws2tcpip.h>
 
 using ioctl_setting = u_long;
 using buffsize_t	= int;
+
+#define AI_ADDRCONFIG 0x00000400
+
+// taken from: https://github.com/rxi/dyad/blob/915ae4939529b9aaaf6ebfd2f65c6cff45fc0eac/src/dyad.c#L58
+inline const char* inet_ntop(int af, const void* src, char* dst, socklen_t size)
+{
+	union
+	{
+		struct sockaddr sa;
+		struct sockaddr_in sai;
+		struct sockaddr_in6 sai6;
+	} addr;
+	int res;
+	memset(&addr, 0, sizeof(addr));
+	addr.sa.sa_family = af;
+	if(af == AF_INET6)
+	{
+		memcpy(&addr.sai6.sin6_addr, src, sizeof(addr.sai6.sin6_addr));
+	}
+	else
+	{
+		memcpy(&addr.sai.sin_addr, src, sizeof(addr.sai.sin_addr));
+	}
+	res = WSAAddressToStringA(&addr.sa, sizeof(addr), 0, dst, (LPDWORD)&size);
+	if(res != 0) return NULL;
+	return dst;
+}
 
 //Handle WinSock2/Windows Socket API initialization and cleanup
 #pragma comment(lib, "Ws2_32.lib")
@@ -165,7 +196,7 @@ namespace kissnet
 
 			///Startup
 			WSA() :
-			 wsa_data {}
+			 wsa_data{}
 			{
 				WSAStartup(MAKEWORD(2, 2), &wsa_data);
 #ifdef KISSNET_WSA_DEBUG
@@ -334,17 +365,17 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address {};
+		std::string address{};
 
 		///The port to connect to
-		port_t port {};
+		port_t port{};
 
 		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-		 address { std::move(addr) }, port { prt }
+		 address{ std::move(addr) }, port{ prt }
 		{}
 
 		static bool is_valid_port_number(unsigned long n)
@@ -467,7 +498,7 @@ namespace kissnet
 
 		///Use the default constructor
 		socket_status() :
-		 value { errored } {}
+		 value{ errored } {}
 
 		///Construct a "errored/valid" status for a true/false
 		explicit socket_status(bool state) :
@@ -517,12 +548,12 @@ namespace kissnet
 		endpoint bind_loc;
 
 		///Address information structures
-		addrinfo getaddrinfo_hints {};
+		addrinfo getaddrinfo_hints{};
 		addrinfo* getaddrinfo_results = nullptr;
 
 		void initialize_addrinfo(int& type, short& family)
 		{
-			int iprotocol {};
+			int iprotocol{};
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				type	  = SOCK_STREAM;
@@ -555,12 +586,12 @@ namespace kissnet
 		///sockaddr struct
 		sockaddr_storage socket_output = {};
 		sockaddr_storage socket_input  = {};
-		socklen_t socket_input_socklen {};
+		socklen_t socket_input_socklen{};
 
 	public:
 		///Construct an invalid socket
 		socket() :
-		 sock { INVALID_SOCKET },
+		 sock{ INVALID_SOCKET },
 		 getaddrinfo_hints(),
 		 socket_input_socklen(0)
 		{
@@ -629,7 +660,7 @@ namespace kissnet
 
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-		 bind_loc { std::move(bind_to) }
+		 bind_loc{ std::move(bind_to) }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -657,7 +688,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-		 sock { native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints {}
+		 sock{ native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints{}
 		{
 			KISSNET_OS_INIT;
 
@@ -774,7 +805,7 @@ namespace kissnet
 		///Send some bytes through the pipe
 		bytes_with_status send(const std::byte* read_buff, size_t length)
 		{
-			auto received_bytes { 0 };
+			auto received_bytes{ 0 };
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
@@ -823,7 +854,7 @@ namespace kissnet
 				if(error == EWOULDBLOCK)
 					return { 0, socket_status::non_blocking_would_have_blocked };
 				if(error == EAGAIN)
-					return {0, socket_status::non_blocking_would_have_blocked};
+					return { 0, socket_status::non_blocking_would_have_blocked };
 				return { 0, socket_status::errored };
 			}
 
