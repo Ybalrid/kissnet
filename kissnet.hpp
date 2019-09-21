@@ -136,6 +136,8 @@ using ioctl_setting = u_long;
 using buffsize_t	= int;
 
 #define AI_ADDRCONFIG 0x00000400
+
+// taken from: https://github.com/rxi/dyad/blob/915ae4939529b9aaaf6ebfd2f65c6cff45fc0eac/src/dyad.c#L58
 inline const char* inet_ntop(int af, const void* src, char* dst, socklen_t size)
 {
 	union
