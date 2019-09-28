@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2018 Arthur Brainville
+ * Copyright (c) 2018-2019 Arthur Brainville (Ybalrid)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -60,12 +60,12 @@
  *  anyway, a tuple containing the expected type returned, and an object that 
  *  represent the status of what happens is returned.
  *
- *  For example, socket send/receive operation can discover that the connexion 
+ *  For example, socket send/receive operation can discover that the connection 
  *  was closed, or was shut down properly. It could also be the fact that a 
  *  socket was configured "non blocking" and would have blocked in this 
  *  situation. On both occasion, these methods will return the fact that 0 bytes 
  *  came across as the transaction size, and the status will indicate either an 
- *  error (socket no longer valid), or an actual status message (connexion 
+ *  error (socket no longer valid), or an actual status message (connection 
  *  closed, socket would have blocked)
  *
  *  These status objects will behave like a const bool that equals "false" when 
@@ -76,11 +76,11 @@
  *  But, for many reasons, you may want to
  *  not use exceptions entirely.
  *
- *  kissnet give you some facilities to get fatal errors informations back, and 
+ *  kissnet give you some facilities to get fatal errors information back, and 
  *  to choose how to handle it. Kissnet give you a few levers you can use:
  *
  *  - You can deactivate the exception support by #defining KISSNET_NO_EXCEP 
- *  before #including kissnet.hpp. Insteand, kissnet will use a function based 
+ *  before #including kissnet.hpp. Instead, kissnet will use a function based 
  *  error handler
  *  - By default, the error handler prints to stderr the error message, and 
  *  abort the program
@@ -157,7 +157,7 @@ inline const char* inet_ntop(int af, const void* src, char* dst, socklen_t size)
 	{
 		memcpy(&addr.sai.sin_addr, src, sizeof(addr.sai.sin_addr));
 	}
-	res = WSAAddressToStringA(&addr.sa, sizeof(addr), 0, dst, (LPDWORD)&size);
+	res = WSAAddressToStringA(&addr.sa, sizeof(addr), 0, dst, reinterpret_cast<LPDWORD>(&size));
 	if(res != 0) return NULL;
 	return dst;
 }
@@ -198,7 +198,34 @@ namespace kissnet
 			WSA() :
 			 wsa_data {}
 			{
-				WSAStartup(MAKEWORD(2, 2), &wsa_data);
+				if(const auto status = WSAStartup(MAKEWORD(2, 2), &wsa_data); status != 0)
+				{
+					std::string error_message;
+					switch(status) // https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-wsastartup#return-value
+					{
+						default:
+							error_message = "Unknown error happened.";
+							break;
+						case WSASYSNOTREADY:
+							error_message = "The underlying network subsystem is not ready for network communication.";
+							break;
+						case WSAVERNOTSUPPORTED: //unlikely, we specify 2.2!
+							error_message = " The version of Windows Sockets support requested "
+											"(2.2)" //we know here the version was 2.2, add that to the error message copied from MSDN
+											" is not provided by this particular Windows Sockets implementation. ";
+							break;
+						case WSAEINPROGRESS:
+							error_message = "A blocking Windows Sockets 1.1 operation is in progress.";
+							break;
+						case WSAEPROCLIM:
+							error_message = "A limit on the number of tasks supported by the Windows Sockets implementation has been reached.";
+							break;
+						case WSAEFAULT: //unlikely, if this ctor is running, wsa_data is part of this object's "stack" data
+							error_message = "The lpWSAData parameter is not a valid pointer.";
+							break;
+					}
+					kissnet_fatal_error(error_message);
+				}
 #ifdef KISSNET_WSA_DEBUG
 				std::cerr << "Initialized Windows Socket API\n";
 #endif
@@ -510,10 +537,10 @@ namespace kissnet
 		///Move socket status by default
 		socket_status(socket_status&&) = default;
 
-		///implicitly convert this object to const bool (as the status shouldn't change)
+		///implicitly convert this object to const bool (as the status should not change)
 		operator bool() const
 		{
-			//See the above enum: every value <= 0 correspound to an error, and will return false. Every value > 0 returns true
+			//See the above enum: every value <= 0 correspond to an error, and will return false. Every value > 0 returns true
 			return value > 0;
 		}
 
@@ -675,7 +702,7 @@ namespace kissnet
 
 			if(getaddrinfo(bind_loc.address.c_str(), std::to_string(bind_loc.port).c_str(), &getaddrinfo_hints, &getaddrinfo_results) != 0)
 			{
-				//TODO There can be more than one adress to attempt to use in the getaddrinfo_results (It's a list). Try to go further down that list in error condition
+				//TODO There can be more than one address to attempt to use in the getaddrinfo_results (It's a list). Try to go further down that list in error condition
 				kissnet_fatal_error("getaddrinfo failed!");
 			}
 
@@ -827,7 +854,7 @@ namespace kissnet
 			return { received_bytes, socket_status::valid };
 		}
 
-		///receive bytes inside the buffer, return the number of bytes you got. You can choose to write inside the buffer at a specifc start offset (in number of bytes)
+		///receive bytes inside the buffer, return the number of bytes you got. You can choose to write inside the buffer at a specific start offset (in number of bytes)
 		template <size_t buff_size>
 		bytes_with_status recv(buffer<buff_size>& write_buff, size_t start_offset = 0)
 		{
