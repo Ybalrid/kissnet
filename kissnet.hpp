@@ -196,7 +196,7 @@ namespace kissnet
 
 			///Startup
 			WSA() :
-			 wsa_data{}
+			 wsa_data {}
 			{
 				WSAStartup(MAKEWORD(2, 2), &wsa_data);
 #ifdef KISSNET_WSA_DEBUG
@@ -279,7 +279,7 @@ using buffsize_t	= size_t;
 
 //To get consistent socket API between Windows and Linux:
 static const int INVALID_SOCKET = -1;
-static const int SOCKET_ERROR   = -1;
+static const int SOCKET_ERROR	= -1;
 using SOCKET					= int;
 using SOCKADDR_IN				= sockaddr_in;
 using SOCKADDR					= sockaddr;
@@ -365,18 +365,18 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address{};
+		std::string address {};
 
 		///The port to connect to
-		port_t port{};
+		port_t port {};
 
 		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-		 address{ std::move(addr) }, port{ prt }
-		{}
+		 address { std::move(addr) }, port { prt }
+		{ }
 
 		static bool is_valid_port_number(unsigned long n)
 		{
@@ -414,16 +414,14 @@ namespace kissnet
 		{
 			switch(addr->sa_family)
 			{
-				case AF_INET:
-				{
+				case AF_INET: {
 					auto ip_addr = (SOCKADDR_IN*)(addr);
 					address		 = inet_ntoa(ip_addr->sin_addr);
 					port		 = ntohs(ip_addr->sin_port);
 				}
 				break;
 
-				case AF_INET6:
-				{
+				case AF_INET6: {
 					auto ip_addr = (sockaddr_in6*)(addr);
 					char buffer[INET6_ADDRSTRLEN];
 					address = inet_ntop(AF_INET6, &(ip_addr->sin6_addr), buffer, INET6_ADDRSTRLEN);
@@ -431,8 +429,7 @@ namespace kissnet
 				}
 				break;
 
-				default:
-				{
+				default: {
 					kissnet_fatal_error("Trying to construct an endpoint for a protocol familly that is neither AF_INET or AF_INET6");
 				}
 			}
@@ -498,14 +495,14 @@ namespace kissnet
 
 		///Use the default constructor
 		socket_status() :
-		 value{ errored } {}
+		 value { errored } { }
 
 		///Construct a "errored/valid" status for a true/false
 		explicit socket_status(bool state) :
-		 value(values(state ? valid : errored)) {}
+		 value(values(state ? valid : errored)) { }
 
 		socket_status(values v) :
-		 value(v) {}
+		 value(v) { }
 
 		///Copy socket status by default
 		socket_status(const socket_status&) = default;
@@ -548,12 +545,12 @@ namespace kissnet
 		endpoint bind_loc;
 
 		///Address information structures
-		addrinfo getaddrinfo_hints{};
+		addrinfo getaddrinfo_hints {};
 		addrinfo* getaddrinfo_results = nullptr;
 
 		void initialize_addrinfo(int& type, short& family)
 		{
-			int iprotocol{};
+			int iprotocol {};
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				type	  = SOCK_STREAM;
@@ -577,21 +574,21 @@ namespace kissnet
 			}
 
 			(void)memset(&getaddrinfo_hints, 0, sizeof getaddrinfo_hints);
-			getaddrinfo_hints.ai_family   = family;
+			getaddrinfo_hints.ai_family	  = family;
 			getaddrinfo_hints.ai_socktype = type;
 			getaddrinfo_hints.ai_protocol = iprotocol;
-			getaddrinfo_hints.ai_flags	= AI_ADDRCONFIG;
+			getaddrinfo_hints.ai_flags	  = AI_ADDRCONFIG;
 		}
 
 		///sockaddr struct
 		sockaddr_storage socket_output = {};
 		sockaddr_storage socket_input  = {};
-		socklen_t socket_input_socklen{};
+		socklen_t socket_input_socklen {};
 
 	public:
 		///Construct an invalid socket
 		socket() :
-		 sock{ INVALID_SOCKET },
+		 sock { INVALID_SOCKET },
 		 getaddrinfo_hints(),
 		 socket_input_socklen(0)
 		{
@@ -660,7 +657,7 @@ namespace kissnet
 
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-		 bind_loc{ std::move(bind_to) }
+		 bind_loc { std::move(bind_to) }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -688,7 +685,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-		 sock{ native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints{}
+		 sock { native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints {}
 		{
 			KISSNET_OS_INIT;
 
@@ -805,7 +802,7 @@ namespace kissnet
 		///Send some bytes through the pipe
 		bytes_with_status send(const std::byte* read_buff, size_t length)
 		{
-			auto received_bytes{ 0 };
+			auto received_bytes { 0 };
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
@@ -830,22 +827,22 @@ namespace kissnet
 			return { received_bytes, socket_status::valid };
 		}
 
-		///receive bytes inside the buffer, return the number of bytes you got
+		///receive bytes inside the buffer, return the number of bytes you got. You can choose to write inside the buffer at a specifc start offset (in number of bytes)
 		template <size_t buff_size>
-		bytes_with_status recv(buffer<buff_size>& write_buff)
+		bytes_with_status recv(buffer<buff_size>& write_buff, size_t start_offset = 0)
 		{
 
 			auto received_bytes = 0;
 			if constexpr(sock_proto == protocol::tcp)
 			{
-				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(write_buff.data()), static_cast<buffsize_t>(buff_size), 0);
+				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset), 0);
 			}
 
 			else if constexpr(sock_proto == protocol::udp)
 			{
 				socket_input_socklen = sizeof socket_input;
 
-				received_bytes = ::recvfrom(sock, reinterpret_cast<char*>(write_buff.data()), static_cast<buffsize_t>(buff_size), 0, reinterpret_cast<sockaddr*>(&socket_input), &socket_input_socklen);
+				received_bytes = ::recvfrom(sock, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset), 0, reinterpret_cast<sockaddr*>(&socket_input), &socket_input_socklen);
 			}
 
 			if(received_bytes < 0)
