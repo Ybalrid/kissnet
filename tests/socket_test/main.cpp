@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <vector>
 
 #define KISSNET_WSA_DEBUG
 #include <kissnet.hpp>
@@ -15,29 +16,44 @@ int main()
 		a_socket.connect();
 
 		//Create a "GET /" HTTP request, and send that packet into the socket
-		auto get_index_request = std::string { "GET / HTTP/1.1\r\nHost: avalon.ybalrid.info\r\n\r\n" };
+		auto get_index_request = std::string { "GET / HTTP/1.1\r\nHost: percival.ybalrid.info\r\n\r\n" };
 
 		//Send request
 		a_socket.send(reinterpret_cast<const std::byte*>(get_index_request.c_str()), get_index_request.size());
+		{
+			//Receive data into a buffer
+			kn::buffer<4096> static_buffer;
 
-		//Receive data into a buffer
-		kn::buffer<4096> static_buffer;
+			//Useless wait, just to show how long the response was
+			std::this_thread::sleep_for(1s);
 
-		//Useless wait, just to show how long the response was
-		std::this_thread::sleep_for(1s);
+			//Print how much data our OS has for us
+			std::cout << "bytes available to read : " << a_socket.bytes_available() << '\n';
 
-		//Print how much data our OS has for us
-		std::cout << "bytes available to read : " << a_socket.bytes_available() << '\n';
+			//Get the data, and the lengh of data
+			const auto [data_size, socket_status] = a_socket.recv(static_buffer);
 
-		//Get the data, and the lengh of data
-		const auto [data_size, socket_status] = a_socket.recv(static_buffer);
+			//To print it as a good old C string, add a null terminator
+			if(data_size < static_buffer.size())
+				static_buffer[data_size] = std::byte { '\0' };
 
-		//To print it as a good old C string, add a null terminator
-		if(data_size < static_buffer.size())
-			static_buffer[data_size] = std::byte { '\0' };
+			//Print the raw data as text into the terminal (should display html/css code here)
+			std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
+		}
+		{
+			std::vector<std::byte> heap_buffer(4096);
 
-		//Print the raw data as text into the terminal (should display html/css code here)
-		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
+			a_socket.send(reinterpret_cast<const std::byte*>(get_index_request.c_str()), get_index_request.size());
+			std::this_thread::sleep_for(1s);
+			const auto [data_size, socket_status] = a_socket.recv(heap_buffer.data(), heap_buffer.size());
+
+			//To print it as a good old C string, add a null terminator
+			if(data_size < heap_buffer.size())
+				heap_buffer[data_size] = std::byte { '\0' };
+
+			//Print the raw data as text into the terminal (should display html/css code here)
+			std::cout << reinterpret_cast<const char*>(heap_buffer.data()) << '\n';
+		}
 	}
 
 	std::cerr << "Every socket object used here has gone out of scope, Thanks to RAII, this will actually close WSA on Windows\n";

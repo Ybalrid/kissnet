@@ -866,6 +866,40 @@ namespace kissnet
 			return { size_t(received_bytes), socket_status::valid };
 		}
 
+		///recive up-to len bytes inside the memory location pointed by buffer
+		bytes_with_status recv(std::byte* buffer, size_t len)
+		{
+			auto received_bytes = 0;
+			if constexpr(sock_proto == protocol::tcp)
+			{
+				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0);
+			}
+
+			else if constexpr(sock_proto == protocol::udp)
+			{
+				socket_input_socklen = sizeof socket_input;
+
+				received_bytes = ::recvfrom(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0, reinterpret_cast<sockaddr*>(&socket_input), &socket_input_socklen);
+			}
+
+			if(received_bytes < 0)
+			{
+				const auto error = get_error_code();
+				if(error == EWOULDBLOCK)
+					return { 0, socket_status::non_blocking_would_have_blocked };
+				if(error == EAGAIN)
+					return { 0, socket_status::non_blocking_would_have_blocked };
+				return { 0, socket_status::errored };
+			}
+
+			if(received_bytes == 0)
+			{
+				return { received_bytes, socket_status::cleanly_disconnected };
+			}
+
+			return { size_t(received_bytes), socket_status::valid };
+		}
+
 		///Return the endpoint where this socket is talking to
 		endpoint get_bind_loc() const
 		{
