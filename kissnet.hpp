@@ -817,6 +817,9 @@ namespace kissnet
 		~socket()
 		{
 			close();
+
+			if(getaddrinfo_results)
+				freeaddrinfo(getaddrinfo_results);
 		}
 
 		template <size_t buff_size>
