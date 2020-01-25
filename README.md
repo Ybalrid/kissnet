@@ -53,7 +53,7 @@ namespace kn = kissnet;
 int main()
 {
 
-{
+	{
 		//Create a kissnet tcp over ssl ipv4 socket
 		kn::tcp_ssl_socket a_socket(kn::endpoint("cpz.github.io:443"));
 		a_socket.connect();
