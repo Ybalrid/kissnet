@@ -2,6 +2,7 @@
  * MIT License
  *
  * Copyright (c) 2018-2019 Arthur Brainville (Ybalrid)
+ * Slighty modified by Konstantin 'cpz' L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -118,6 +119,9 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include <openssl\ssl.h>
+#include <openssl\err.h>
 
 #ifdef _WIN32
 
@@ -371,8 +375,9 @@ namespace kissnet
 		}
 	}
 
-	///low level protocol used, between TCP and UDP
+	///low level protocol used, between TCP\TCP_SSL and UDP
 	enum class protocol { tcp,
+		                  tcp_ssl,
 						  udp };
 
 	///Represent ipv4 vs ipv6
@@ -567,6 +572,7 @@ namespace kissnet
 
 		///operatic-system type for a socket object
 		SOCKET sock;
+		SSL *ssl;
 
 		///Location where this socket is bound
 		endpoint bind_loc;
@@ -581,6 +587,12 @@ namespace kissnet
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				type	  = SOCK_STREAM;
+				iprotocol = IPPROTO_TCP;
+			}
+			
+			else if constexpr (sock_proto == protocol::tcp_ssl)
+			{
+				type = SOCK_STREAM;
 				iprotocol = IPPROTO_TCP;
 			}
 
@@ -761,6 +773,36 @@ namespace kissnet
 				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
 
 				return static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR);
+			} 
+			else if constexpr (sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
+			{
+				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
+
+				if (!(static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR)))
+					return false;
+
+				SSL_library_init();
+				SSLeay_add_ssl_algorithms();
+
+				auto *ssl_method = TLSv1_2_client_method();
+
+				SSL_load_error_strings();
+
+				auto *pContext = SSL_CTX_new(ssl_method);
+				ssl = SSL_new(pContext);
+				if (!ssl)
+					return false;
+
+				//auto SSL_sock = SSL_get_fd(ssl);
+				if (!(static_cast<bool>(SSL_set_fd(ssl, sock))))
+					return false;
+
+
+				auto err = SSL_connect(ssl);
+				if (err <= 0)
+					return false;
+
+				return true;
 			}
 		}
 
@@ -810,6 +852,14 @@ namespace kissnet
 			if(!(sock == INVALID_SOCKET))
 				closesocket(sock);
 
+			if constexpr (sock_proto == protocol::tcp_ssl)
+			{
+				ERR_free_strings();
+				EVP_cleanup();
+				SSL_shutdown(ssl);
+				SSL_free(ssl);
+			}
+
 			sock = INVALID_SOCKET;
 		}
 
@@ -836,6 +886,11 @@ namespace kissnet
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
+			}
+
+			else if constexpr (sock_proto == protocol::tcp_ssl)
+			{
+				received_bytes = SSL_write(ssl, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length));
 			}
 
 			else if constexpr(sock_proto == protocol::udp)
@@ -866,6 +921,11 @@ namespace kissnet
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset), 0);
+			}
+
+			else if constexpr (sock_proto == protocol::tcp_ssl)
+			{
+				received_bytes = SSL_read(ssl, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset));
 			}
 
 			else if constexpr(sock_proto == protocol::udp)
@@ -900,6 +960,11 @@ namespace kissnet
 			if constexpr(sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0);
+			}
+
+			else if constexpr (sock_proto == protocol::tcp_ssl)
+			{
+				received_bytes = SSL_read(ssl, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len));
 			}
 
 			else if constexpr(sock_proto == protocol::udp)
@@ -969,6 +1034,8 @@ namespace kissnet
 
 	///Alias for socket<protocol::tcp>
 	using tcp_socket = socket<protocol::tcp>;
+	///Alias for socket<protocol::tcp_ssl>
+	using tcp_ssl_socket = socket<protocol::tcp_ssl>;
 	///Alias for socket<protocol::udp>
 	using udp_socket = socket<protocol::udp>;
 	///IPV6 version of a TCP socket
