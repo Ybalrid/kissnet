@@ -972,10 +972,15 @@ namespace kissnet
 			{
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0);
 			}
+			
+			
+#ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl)
 			{
 				received_bytes = SSL_read(ssl, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len));
 			}
+#endif
+
 			else if constexpr(sock_proto == protocol::udp)
 			{
 				socket_input_socklen = sizeof socket_input;
