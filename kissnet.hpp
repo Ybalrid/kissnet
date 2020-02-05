@@ -2,7 +2,7 @@
  * MIT License
  *
  * Copyright (c) 2018-2019 Arthur Brainville (Ybalrid)
- * Slighty modified by Konstantin 'cpz' L.
+ * OpenSSL integration made by Konstantin 'cpz' L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -110,6 +110,15 @@
 #define kissnet_fatal_error(STR) kissnet::error::handle(STR);
 #endif
 
+#ifdef KISSNET_USE_OPENSSL
+#include <openssl\ssl.h>
+#include <openssl\err.h>
+
+#define InitializeOPENSSL SSL_library_init(); SSLeay_add_ssl_algorithms();
+#define EndOPENSSL        EVP_cleanup();
+#endif
+
+
 #include <array>
 #include <memory>
 #include <cstddef>
@@ -119,9 +128,6 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
-
-#include <openssl\ssl.h>
-#include <openssl\err.h>
 
 #ifdef _WIN32
 
@@ -572,7 +578,10 @@ namespace kissnet
 
 		///operatic-system type for a socket object
 		SOCKET sock;
+#ifdef KISSNET_USE_OPENSSL
 		SSL *ssl;
+		SSL_CTX* pContext;
+#endif
 
 		///Location where this socket is bound
 		endpoint bind_loc;
@@ -773,7 +782,8 @@ namespace kissnet
 				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
 
 				return static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR);
-			} 
+			}
+#ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
 			{
 				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
@@ -781,22 +791,15 @@ namespace kissnet
 				if (!(static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR)))
 					return false;
 
-				SSL_library_init();
-				SSLeay_add_ssl_algorithms();
-
 				auto *ssl_method = TLSv1_2_client_method();
 
-				SSL_load_error_strings();
-
-				auto *pContext = SSL_CTX_new(ssl_method);
+				pContext = SSL_CTX_new(ssl_method);
 				ssl = SSL_new(pContext);
 				if (!ssl)
 					return false;
 
-				//auto SSL_sock = SSL_get_fd(ssl);
 				if (!(static_cast<bool>(SSL_set_fd(ssl, sock))))
 					return false;
-
 
 				auto err = SSL_connect(ssl);
 				if (err <= 0)
@@ -804,6 +807,7 @@ namespace kissnet
 
 				return true;
 			}
+#endif
 		}
 
 		///(for TCP= setup socket to listen to connection. Need to be called on binded socket, before being able to accept()
@@ -849,15 +853,22 @@ namespace kissnet
 
 		void close()
 		{
-			if(!(sock == INVALID_SOCKET))
-				closesocket(sock);
-
-			if constexpr (sock_proto == protocol::tcp_ssl)
+			if (!(sock == INVALID_SOCKET))
 			{
-				ERR_free_strings();
-				EVP_cleanup();
-				SSL_shutdown(ssl);
-				SSL_free(ssl);
+#ifdef KISSNET_USE_OPENSSL
+				if constexpr (sock_proto == protocol::tcp_ssl)
+				{
+					if (ssl && pContext)
+					{
+						SSL_set_shutdown(ssl, SSL_RECEIVED_SHUTDOWN | SSL_SENT_SHUTDOWN);
+						SSL_shutdown(ssl);
+						SSL_free(ssl);
+						SSL_CTX_free(pContext);
+					}
+				}
+#endif
+
+				closesocket(sock);
 			}
 
 			sock = INVALID_SOCKET;
@@ -887,12 +898,12 @@ namespace kissnet
 			{
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
 			}
-
+#ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl)
 			{
 				received_bytes = SSL_write(ssl, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length));
 			}
-
+#endif
 			else if constexpr(sock_proto == protocol::udp)
 			{
 				memcpy(&socket_output, getaddrinfo_results->ai_addr, getaddrinfo_results->ai_addrlen);
@@ -922,12 +933,12 @@ namespace kissnet
 			{
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset), 0);
 			}
-
+#ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl)
 			{
 				received_bytes = SSL_read(ssl, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset));
 			}
-
+#endif
 			else if constexpr(sock_proto == protocol::udp)
 			{
 				socket_input_socklen = sizeof socket_input;
@@ -961,12 +972,10 @@ namespace kissnet
 			{
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0);
 			}
-
 			else if constexpr (sock_proto == protocol::tcp_ssl)
 			{
 				received_bytes = SSL_read(ssl, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len));
 			}
-
 			else if constexpr(sock_proto == protocol::udp)
 			{
 				socket_input_socklen = sizeof socket_input;

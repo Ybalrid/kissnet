@@ -53,6 +53,9 @@ namespace kn = kissnet;
 int main()
 {
 
+    // Before using OpenSSL we need it Initialize it first, we initialize it via defiine in kissnet.hpp, please don't forget define somewhere in your proejct
+	// #define KISSNET_USE_OPENSSL
+	InitializeOPENSSL
 	{
 		//Create a kissnet tcp over ssl ipv4 socket
 		kn::tcp_ssl_socket a_socket(kn::endpoint("cpz.github.io:443"));
@@ -83,6 +86,8 @@ int main()
 		//Print the raw data as text into the terminal (should display html/css code here)
 		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
 	}
+	// Before exiting your program, please, don't forget to cleanup OpenSSL 
+	EndOPENSSL
 	
 	/*No more socket here, this will actually close WSA on Windows*/
 	
