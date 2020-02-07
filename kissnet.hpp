@@ -25,28 +25,28 @@
  * INTRODUCTION
  * ============
  *
- * Kissnet is a simple C++17 layer around the raw OS provided socket API to be 
+ * Kissnet is a simple C++17 layer around the raw OS provided socket API to be
  * used on IP networks with the TCP and UDP protocols.
  *
- * Kissnet is not a networking framework, and it will not process your data or 
- * assist you in any way. Kissnet's only goal is to provide a simple API to send 
+ * Kissnet is not a networking framework, and it will not process your data or
+ * assist you in any way. Kissnet's only goal is to provide a simple API to send
  * and receive bytes,
- * without having to play around with a bunch of structure, file descriptors, 
- * handles and pointers given to a C-style API. The other goal of kissnet is to 
+ * without having to play around with a bunch of structure, file descriptors,
+ * handles and pointers given to a C-style API. The other goal of kissnet is to
  * provide an API that will works in a cross platform setting.
  *
- * Kissnet will automatically manage the eventual startup/shutdown of the 
- * library needed to perform socket operations on a particular platform. (e.g. 
+ * Kissnet will automatically manage the eventual startup/shutdown of the
+ * library needed to perform socket operations on a particular platform. (e.g.
  * the Windows Socket API on MS-Windows.
  *
- * Kissnet leverages (and expect you to do so), multiple features from C++17, 
- * including: std::byte, if constexpr, structured bindings, if-initializer and 
+ * Kissnet leverages (and expect you to do so), multiple features from C++17,
+ * including: std::byte, if constexpr, structured bindings, if-initializer and
  * template parameter type deduction.
  *
  * The library is structured across 4 exposed data types:
  *
- *  - buffer<size_t> : a static array of std::byte implemented via std::array. 
- *  This is what you should use to hold raw data you are getting from a socket, 
+ *  - buffer<size_t> : a static array of std::byte implemented via std::array.
+ *  This is what you should use to hold raw data you are getting from a socket,
  *  before extracting what you need from the bytes
  *  - port_t : a 16 bit unsigned number. Represent a network port number
  *  - endpoint : a structure that represent a location where you need to connect
@@ -57,46 +57,46 @@
  * Kissnet does error handling in 2 ways:
  *
  *  1:
- *  When an operation can generate an error that the user should handle by hand 
- *  anyway, a tuple containing the expected type returned, and an object that 
+ *  When an operation can generate an error that the user should handle by hand
+ *  anyway, a tuple containing the expected type returned, and an object that
  *  represent the status of what happens is returned.
  *
- *  For example, socket send/receive operation can discover that the connection 
- *  was closed, or was shut down properly. It could also be the fact that a 
- *  socket was configured "non blocking" and would have blocked in this 
- *  situation. On both occasion, these methods will return the fact that 0 bytes 
- *  came across as the transaction size, and the status will indicate either an 
- *  error (socket no longer valid), or an actual status message (connection 
+ *  For example, socket send/receive operation can discover that the connection
+ *  was closed, or was shut down properly. It could also be the fact that a
+ *  socket was configured "non blocking" and would have blocked in this
+ *  situation. On both occasion, these methods will return the fact that 0 bytes
+ *  came across as the transaction size, and the status will indicate either an
+ *  error (socket no longer valid), or an actual status message (connection
  *  closed, socket would have blocked)
  *
- *  These status objects will behave like a const bool that equals "false" when 
+ *  These status objects will behave like a const bool that equals "false" when
  *  an error occurred, and "true" when it's just a status notification
  *
  *  2:
- *  Fatal errors are by default handled by throwing a runtime_error exception. 
+ *  Fatal errors are by default handled by throwing a runtime_error exception.
  *  But, for many reasons, you may want to
  *  not use exceptions entirely.
  *
- *  kissnet give you some facilities to get fatal errors information back, and 
+ *  kissnet give you some facilities to get fatal errors information back, and
  *  to choose how to handle it. Kissnet give you a few levers you can use:
  *
- *  - You can deactivate the exception support by #defining KISSNET_NO_EXCEP 
- *  before #including kissnet.hpp. Instead, kissnet will use a function based 
+ *  - You can deactivate the exception support by #defining KISSNET_NO_EXCEP
+ *  before #including kissnet.hpp. Instead, kissnet will use a function based
  *  error handler
- *  - By default, the error handler prints to stderr the error message, and 
+ *  - By default, the error handler prints to stderr the error message, and
  *  abort the program
- *  - kissnet::error::callback is a function pointer that gets a string, and a 
+ *  - kissnet::error::callback is a function pointer that gets a string, and a
  *  context pointer. The string is the error message, and the context pointer
- * what ever you gave kissnet for the occasion. This is a global pointer that 
- * you can set as you want. This will override the "print to stderr" behavior 
+ * what ever you gave kissnet for the occasion. This is a global pointer that
+ * you can set as you want. This will override the "print to stderr" behavior
  * at fatal error time.
- *  - kissnet::error::ctx is a void*, this will be passed to your error handler 
- *  as a "context" pointer. If you need your handler to write to a log, 
+ *  - kissnet::error::ctx is a void*, this will be passed to your error handler
+ *  as a "context" pointer. If you need your handler to write to a log,
  *  or to turn on the HTCPCP enabled teapot on John's desk, you can.
- *  - kissnet::abortOnFatalError is a boolean that will control the call to 
- *  abort(). This is independent to the fact that you did set or not an error 
- *  callback. please note that any object involved with the operation that 
- * triggered the fatal error is probably in an invalid state, and probably 
+ *  - kissnet::abortOnFatalError is a boolean that will control the call to
+ *  abort(). This is independent to the fact that you did set or not an error
+ *  callback. please note that any object involved with the operation that
+ * triggered the fatal error is probably in an invalid state, and probably
  * deserve to be thrown away.
  */
 
@@ -114,10 +114,11 @@
 #include <openssl\ssl.h>
 #include <openssl\err.h>
 
-#define InitializeOPENSSL SSL_library_init(); SSLeay_add_ssl_algorithms();
-#define EndOPENSSL        EVP_cleanup();
+#define kissnet_initialize_openssl \
+	SSL_library_init();            \
+	SSLeay_add_ssl_algorithms();
+#define kissnet_uninitialize_openssl EVP_cleanup();
 #endif
-
 
 #include <array>
 #include <memory>
@@ -382,9 +383,11 @@ namespace kissnet
 	}
 
 	///low level protocol used, between TCP\TCP_SSL and UDP
-	enum class protocol { tcp,
-		                  tcp_ssl,
-						  udp };
+	enum class protocol {
+		tcp,
+		tcp_ssl,
+		udp
+	};
 
 	///Represent ipv4 vs ipv6
 	enum class ip {
@@ -414,7 +417,7 @@ namespace kissnet
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
 		 address { std::move(addr) }, port { prt }
-		{ }
+		{}
 
 		static bool is_valid_port_number(unsigned long n)
 		{
@@ -533,14 +536,14 @@ namespace kissnet
 
 		///Use the default constructor
 		socket_status() :
-		 value { errored } { }
+		 value { errored } {}
 
 		///Construct a "errored/valid" status for a true/false
 		explicit socket_status(bool state) :
-		 value(values(state ? valid : errored)) { }
+		 value(values(state ? valid : errored)) {}
 
 		socket_status(values v) :
-		 value(v) { }
+		 value(v) {}
 
 		///Copy socket status by default
 		socket_status(const socket_status&) = default;
@@ -579,7 +582,7 @@ namespace kissnet
 		///operatic-system type for a socket object
 		SOCKET sock;
 #ifdef KISSNET_USE_OPENSSL
-		SSL *ssl;
+		SSL* pSSL;
 		SSL_CTX* pContext;
 #endif
 
@@ -593,15 +596,9 @@ namespace kissnet
 		void initialize_addrinfo(int& type, short& family)
 		{
 			int iprotocol {};
-			if constexpr(sock_proto == protocol::tcp)
+			if constexpr(sock_proto == protocol::tcp || sock_proto == protocol::tcp_ssl)
 			{
 				type	  = SOCK_STREAM;
-				iprotocol = IPPROTO_TCP;
-			}
-			
-			else if constexpr (sock_proto == protocol::tcp_ssl)
-			{
-				type = SOCK_STREAM;
 				iprotocol = IPPROTO_TCP;
 			}
 
@@ -784,25 +781,24 @@ namespace kissnet
 				return static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR);
 			}
 #ifdef KISSNET_USE_OPENSSL
-			else if constexpr (sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
+			else if constexpr(sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
 			{
 				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
 
-				if (!(static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR)))
+				if(!(static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR)))
 					return false;
 
-				auto *ssl_method = TLSv1_2_client_method();
+				auto* ssl_method = TLSv1_2_client_method();
 
 				pContext = SSL_CTX_new(ssl_method);
-				ssl = SSL_new(pContext);
-				if (!ssl)
+				pSSL	 = SSL_new(pContext);
+				if(!pSSL)
 					return false;
 
-				if (!(static_cast<bool>(SSL_set_fd(ssl, sock))))
+				if(!(static_cast<bool>(SSL_set_fd(pSSL, sock))))
 					return false;
 
-				auto err = SSL_connect(ssl);
-				if (err <= 0)
+				if(SSL_connect(pSSL) <= 0)
 					return false;
 
 				return true;
@@ -853,16 +849,16 @@ namespace kissnet
 
 		void close()
 		{
-			if (!(sock == INVALID_SOCKET))
+			if(sock != INVALID_SOCKET)
 			{
 #ifdef KISSNET_USE_OPENSSL
-				if constexpr (sock_proto == protocol::tcp_ssl)
+				if constexpr(sock_proto == protocol::tcp_ssl)
 				{
-					if (ssl && pContext)
+					if(pSSL && pContext)
 					{
-						SSL_set_shutdown(ssl, SSL_RECEIVED_SHUTDOWN | SSL_SENT_SHUTDOWN);
-						SSL_shutdown(ssl);
-						SSL_free(ssl);
+						SSL_set_shutdown(pSSL, SSL_RECEIVED_SHUTDOWN | SSL_SENT_SHUTDOWN);
+						SSL_shutdown(pSSL);
+						SSL_free(pSSL);
 						SSL_CTX_free(pContext);
 					}
 				}
@@ -899,9 +895,9 @@ namespace kissnet
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
 			}
 #ifdef KISSNET_USE_OPENSSL
-			else if constexpr (sock_proto == protocol::tcp_ssl)
+			else if constexpr(sock_proto == protocol::tcp_ssl)
 			{
-				received_bytes = SSL_write(ssl, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length));
+				received_bytes = SSL_write(pSSL, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length));
 			}
 #endif
 			else if constexpr(sock_proto == protocol::udp)
@@ -934,9 +930,9 @@ namespace kissnet
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset), 0);
 			}
 #ifdef KISSNET_USE_OPENSSL
-			else if constexpr (sock_proto == protocol::tcp_ssl)
+			else if constexpr(sock_proto == protocol::tcp_ssl)
 			{
-				received_bytes = SSL_read(ssl, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset));
+				received_bytes = SSL_read(pSSL, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset));
 			}
 #endif
 			else if constexpr(sock_proto == protocol::udp)
@@ -972,12 +968,11 @@ namespace kissnet
 			{
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0);
 			}
-			
-			
+
 #ifdef KISSNET_USE_OPENSSL
-			else if constexpr (sock_proto == protocol::tcp_ssl)
+			else if constexpr(sock_proto == protocol::tcp_ssl)
 			{
-				received_bytes = SSL_read(ssl, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len));
+				received_bytes = SSL_read(pSSL, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len));
 			}
 #endif
 
