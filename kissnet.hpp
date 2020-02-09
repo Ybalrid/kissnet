@@ -111,13 +111,13 @@
 #endif
 
 #ifdef KISSNET_USE_OPENSSL
+
+#if OPENSSL_VERSION_NUMBER > 0x10100000L
+#error OpenSSL version above 1.1.0 are not supported
+#endif
+
 #include <openssl\ssl.h>
 #include <openssl\err.h>
-
-#define kissnet_initialize_openssl \
-	SSL_library_init();            \
-	SSLeay_add_ssl_algorithms();
-#define kissnet_uninitialize_openssl EVP_cleanup();
 #endif
 
 #include <array>
@@ -569,6 +569,27 @@ namespace kissnet
 		}
 	};
 
+	#ifdef KISSNET_USE_OPENSSL
+	class Initialize_SSL
+	{
+	public:
+		Initialize_SSL()
+		{
+			SSL_load_error_strings();
+			SSL_library_init();
+			SSLeay_add_ssl_algorithms();
+		}
+
+		~Initialize_SSL()
+		{
+			ERR_free_strings();
+			EVP_cleanup();
+		}
+	};
+
+	static Initialize_SSL InitializeSSL;
+	#endif
+
 	///Class that represent a socket
 	template <protocol sock_proto, ip ipver = ip::v4>
 	class socket
@@ -581,6 +602,7 @@ namespace kissnet
 
 		///operatic-system type for a socket object
 		SOCKET sock;
+
 #ifdef KISSNET_USE_OPENSSL
 		SSL* pSSL;
 		SSL_CTX* pContext;
@@ -657,6 +679,11 @@ namespace kissnet
 			socket_input_socklen			 = std::move(other.socket_input_socklen);
 			getaddrinfo_results				 = std::move(other.getaddrinfo_results);
 
+			#ifdef KISSNET_USE_OPENSSL
+			pSSL		                     = std::move(other.pSSL);
+			pContext                         = std::move(other.pContext);
+		    #endif
+
 			other.sock = INVALID_SOCKET;
 		}
 
@@ -677,6 +704,11 @@ namespace kissnet
 				socket_input					 = std::move(other.socket_input);
 				socket_input_socklen			 = std::move(other.socket_input_socklen);
 				getaddrinfo_results				 = std::move(other.getaddrinfo_results);
+
+				#ifdef KISSNET_USE_OPENSSL
+				pSSL	 = std::move(other.pSSL);
+				pContext = std::move(other.pContext);
+               #endif
 
 				other.sock = INVALID_SOCKET;
 			}
@@ -788,9 +820,9 @@ namespace kissnet
 				if(!(static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR)))
 					return false;
 
-				auto* ssl_method = TLSv1_2_client_method();
+				auto* pMethod = TLSv1_2_client_method();
 
-				pContext = SSL_CTX_new(ssl_method);
+				pContext = SSL_CTX_new(pMethod);
 				pSSL	 = SSL_new(pContext);
 				if(!pSSL)
 					return false;
@@ -798,7 +830,7 @@ namespace kissnet
 				if(!(static_cast<bool>(SSL_set_fd(pSSL, sock))))
 					return false;
 
-				if(SSL_connect(pSSL) <= 0)
+				if(SSL_connect(pSSL) != 1)
 					return false;
 
 				return true;
