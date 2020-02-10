@@ -116,8 +116,8 @@
 #error OpenSSL version above 1.1.0 are not supported
 #endif
 
-#include <openssl\ssl.h>
-#include <openssl\err.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #endif
 
 #include <array>
