@@ -12,6 +12,7 @@ Wrap all annoying C api calls to the OS inside a `socket` template class
 
 * Stupidly simple
 * TCP socket
+* TCP SSL socket
 * UDP socket
 * ipv4 and ipv6 support
 * Error reporting with and without exceptions
@@ -51,8 +52,47 @@ namespace kn = kissnet;
 
 int main()
 {
+
+    // Before using OpenSSL we need it Initialize it first, we initialize it via defiine in kissnet.hpp, please don't forget define somewhere in your proejct
+	// #define KISSNET_USE_OPENSSL
+	InitializeOPENSSL
 	{
-		//Create a kissnet tco ipv4 socket
+		//Create a kissnet tcp over ssl ipv4 socket
+		kn::tcp_ssl_socket a_socket(kn::endpoint("cpz.github.io:443"));
+		a_socket.connect();
+
+		//Create a "GET /" HTTP request, and send that packet into the socket
+		auto get_index_request = std::string{ "GET / HTTP/1.1\r\nHost: cpz.github.io\r\n\r\n" };
+
+		//Send request
+		a_socket.send(reinterpret_cast<const std::byte*>(get_index_request.c_str()), get_index_request.size());
+
+		//Receive data into a buffer
+		kn::buffer<4096> static_buffer;
+
+		//Useless wait, just to show how long the response was
+		std::this_thread::sleep_for(1s);
+
+		//Print how much data our OS has for us
+		std::cout << "bytes available to read : " << a_socket.bytes_available() << '\n';
+
+		//Get the data, and the lengh of data
+		const auto [data_size, status_code] = a_socket.recv(static_buffer);
+
+		//To print it as a good old C string, add a null terminator
+		if(data_size < static_buffer.size())
+			static_buffer[data_size] = std::byte{ '\0' };
+
+		//Print the raw data as text into the terminal (should display html/css code here)
+		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
+	}
+	// Before exiting your program, please, don't forget to cleanup OpenSSL 
+	EndOPENSSL
+	
+	/*No more socket here, this will actually close WSA on Windows*/
+	
+	{
+		//Create a kissnet tcp ipv4 socket
 		kn::tcp_socket a_socket(kn::endpoint("avalon.ybalrid.info:80"));
 		a_socket.connect();
 
