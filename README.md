@@ -85,6 +85,7 @@ int main()
 		//Print the raw data as text into the terminal (should display html/css code here)
 		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
 	}
+	
 	/* Nothing need to do for OpenSSL uninitialization because our class will do everything by himself. */
 
 	/*No more socket here, this will actually close WSA on Windows*/
