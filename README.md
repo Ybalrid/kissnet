@@ -53,7 +53,8 @@ namespace kn = kissnet;
 int main()
 {
 
-      /* No need to initializate SSL because its initializated at start of program if KISSNET_USE_OPENSSL is used. */
+    /* No need to initializate SSL because its initializated at start of program if KISSNET_USE_OPENSSL is used. */
+	
 	{
 		//Create a kissnet tcp over ssl ipv4 socket
 		kn::tcp_ssl_socket a_socket(kn::endpoint("cpz.github.io:443"));
