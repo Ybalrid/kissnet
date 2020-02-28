@@ -53,7 +53,8 @@ namespace kn = kissnet;
 int main()
 {
 
-  // No need to initializate SSL because its initializated at start of program if KISSNET_USE_OPENSSL is used.
+    /* No need to initializate SSL because its initializated at start of program if KISSNET_USE_OPENSSL is used. */
+	
 	{
 		//Create a kissnet tcp over ssl ipv4 socket
 		kn::tcp_ssl_socket a_socket(kn::endpoint("cpz.github.io:443"));
@@ -84,7 +85,8 @@ int main()
 		//Print the raw data as text into the terminal (should display html/css code here)
 		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
 	}
-	// Nothing need to do for OpenSSL uninitialization because our class will do everything by himself.
+	
+	/* Nothing need to do for OpenSSL uninitialization because our class will do everything by himself. */
 
 	/*No more socket here, this will actually close WSA on Windows*/
 
