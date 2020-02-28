@@ -111,9 +111,9 @@
 #endif
 
 #ifdef KISSNET_USE_OPENSSL
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#endif
 
 #endif
 
@@ -576,7 +576,7 @@ namespace kissnet
 		{
 			SSL_lock_cs = std::make_shared< std::vector < std::mutex > >( CRYPTO_num_locks() );
 
-			CRYPTO_set_locking_callback( (void (*)(int, int, const char*, int))
+			CRYPTO_set_locking_callback((void (*)(int, int, const char*, int))
 				win32_locking_callback);
 		}
 
