@@ -128,22 +128,11 @@
 
 #ifndef NOMINMAX
 #define NOMINMAX
-#endif
+#endif //endif nominmax
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
-
-#ifdef KISSNET_USE_OPENSSL
-
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
-#include <vector>
-#include <mutex>
-
-#endif
-
 
 using ioctl_setting = u_long;
 using buffsize_t = int;
@@ -350,7 +339,18 @@ inline int get_error_code()
 	return errno;
 }
 
-#endif
+#endif //ifdef WIN32
+
+
+#ifdef KISSNET_USE_OPENSSL
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+#include <vector>
+#include <mutex>
+
+#endif //Kissnet use OpenSSL
 
 ///Main namespace of kissnet
 namespace kissnet
