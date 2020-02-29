@@ -110,15 +110,6 @@
 #define kissnet_fatal_error(STR) kissnet::error::handle(STR);
 #endif
 
-#ifdef KISSNET_USE_OPENSSL
-
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
-#include <vector>
-#include <mutex>
-
-#endif
 
 #include <array>
 #include <memory>
@@ -140,8 +131,19 @@
 #endif
 
 #include <winsock2.h>
-#include <windows.h>
 #include <ws2tcpip.h>
+#include <windows.h>
+
+#ifdef KISSNET_USE_OPENSSL
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+#include <vector>
+#include <mutex>
+
+#endif
+
 
 using ioctl_setting = u_long;
 using buffsize_t = int;
