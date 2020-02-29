@@ -115,6 +115,9 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <vector>
+#include <mutex>
+
 #endif
 
 #include <array>
