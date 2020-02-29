@@ -569,6 +569,7 @@ namespace kissnet
 		}
 	};
 
+#ifdef KISSNET_USE_OPENSSL
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	static std::shared_ptr <std::vector< std::mutex > > SSL_lock_cs;
 
@@ -603,7 +604,6 @@ namespace kissnet
 
 #endif
 
-#ifdef KISSNET_USE_OPENSSL
 	class Initialize_SSL
 	{
 	public:
