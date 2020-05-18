@@ -737,6 +737,7 @@ namespace kissnet
 #endif
 
 			other.sock = INVALID_SOCKET;
+			other.getaddrinfo_results = nullptr;
 		}
 
 		///Move assign operation
@@ -763,6 +764,7 @@ namespace kissnet
 #endif
 
 				other.sock = INVALID_SOCKET;
+				other.getaddrinfo_results = nullptr;
 			}
 			return *this;
 		}
