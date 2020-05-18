@@ -763,6 +763,7 @@ namespace kissnet
 #endif
 
 				other.sock = INVALID_SOCKET;
+				other.getaddrinfo_results = nullptr;
 			}
 			return *this;
 		}
