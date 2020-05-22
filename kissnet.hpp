@@ -656,8 +656,8 @@ namespace kissnet
 		SOCKET sock;
 
 #ifdef KISSNET_USE_OPENSSL
-		SSL* pSSL;
-		SSL_CTX* pContext;
+		SSL* pSSL = nullptr;
+		SSL_CTX* pContext = nullptr;
 #endif
 
 		///Location where this socket is bound
@@ -732,8 +732,10 @@ namespace kissnet
 			getaddrinfo_results = std::move(other.getaddrinfo_results);
 
 #ifdef KISSNET_USE_OPENSSL
-			pSSL = std::move(other.pSSL);
-			pContext = std::move(other.pContext);
+			pSSL = other.pSSL;
+			pContext = other.pContext;
+			other.pSSL = nullptr;
+			other.pContext = nullptr;
 #endif
 
 			other.sock = INVALID_SOCKET;
@@ -759,8 +761,10 @@ namespace kissnet
 				getaddrinfo_results = std::move(other.getaddrinfo_results);
 
 #ifdef KISSNET_USE_OPENSSL
-				pSSL = std::move(other.pSSL);
-				pContext = std::move(other.pContext);
+				pSSL = other.pSSL;
+				pContext = other.pContext;
+				other.pSSL = nullptr;
+				other.pContext = nullptr;
 #endif
 
 				other.sock = INVALID_SOCKET;
@@ -940,12 +944,13 @@ namespace kissnet
 #ifdef KISSNET_USE_OPENSSL
 				if constexpr (sock_proto == protocol::tcp_ssl)
 				{
-					if (pSSL && pContext)
+					if (pSSL)
 					{
 						SSL_set_shutdown(pSSL, SSL_RECEIVED_SHUTDOWN | SSL_SENT_SHUTDOWN);
 						SSL_shutdown(pSSL);
 						SSL_free(pSSL);
-						SSL_CTX_free(pContext);
+						if(pContext)
+							SSL_CTX_free(pContext);
 					}
 				}
 #endif
