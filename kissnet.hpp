@@ -848,6 +848,15 @@ namespace kissnet
 				kissnet_fatal_error("setting socket to nonblock returned an error");
 		}
 
+		///Set the socket option for broadcasts
+		/// \param state By default "true". If put to false, it will disable broadcasts
+		void set_broadcast(bool state = true) const
+		{
+			const int broadcast = state ? 1 : 0;
+			if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast)) != 0)
+				kissnet_fatal_error("setting socket broadcast mode returned an error");
+		}
+
 		///Bind socket locally using the address and port of the endpoint
 		void bind()
 		{
