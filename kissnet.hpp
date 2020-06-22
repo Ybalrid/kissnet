@@ -1060,7 +1060,7 @@ namespace kissnet
 			return { size_t(received_bytes), socket_status::valid };
 		}
 
-		///recive up-to len bytes inside the memory location pointed by buffer
+		///receive up-to len bytes inside the memory location pointed by buffer
 		bytes_with_status recv(std::byte* buffer, size_t len)
 		{
 			auto received_bytes = 0;
