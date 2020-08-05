@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    paths:
+      - "**/*.cpp"
+      - "**/*.cmake"
+      - "**/CMakeLists.txt"
+      - ".github/workflows/ci.yml"
+
+
+jobs:
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - run: cmake -B build
+      env:
+        CXX: g++-9
+
+    - run: cmake --build build --parallel
+
+    - run: ctest --output-on-failure
+      working-directory: build
+
+
+  mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - run: brew install openssl
+
+    - run: cmake -B build -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
+      env:
+        CXX: g++-9
+
+    - run: cmake --build build --parallel
+
+    - run: ctest --output-on-failure
+      working-directory: build
+
+
+  mingw:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: cinst -y ninja openssl.light
+
+      - run: cmake -B build -G Ninja
+
+      - run: cmake --build build --parallel
+
+      - run: ctest --output-on-failure
+        working-directory: build

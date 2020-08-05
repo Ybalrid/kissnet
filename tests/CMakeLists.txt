@@ -23,5 +23,13 @@ foreach(t acceptor_test endpoint_test error_handler_test simple_test socket_test
   target_compile_features(${t} PRIVATE cxx_std_17)
   target_include_directories(${t} PRIVATE ${incdir})
   set_target_properties(${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+  if(MSVC)
+    set_target_properties(${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE ${PROJECT_BINARY_DIR}/Release)
+  endif()
   target_link_libraries(${t} PRIVATE ${WINSOCK_LIBRARIES})
+endforeach()
+
+foreach(t endpoint_test error_handler_test simple_test)
+  add_test(NAME test:${t} COMMAND $<TARGET_FILE:${t}>)
+  set_tests_properties(test:${t} PROPERTIES TIMEOUT 5)
 endforeach()
