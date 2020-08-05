@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.13)
 project(kissnet_ci LANGUAGES CXX)
 enable_testing()
 
-option(build_tests "build test programs")
+option(build_tests "build test programs" ON)
 
 find_package(OpenSSL REQUIRED)
 
