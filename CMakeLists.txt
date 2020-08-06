@@ -1,8 +1,19 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.13)
-project(kissnet_ci LANGUAGES CXX)
+set(CMAKE_CONFIGURATION_TYPES "Release;RelWithDebInfo;Debug" CACHE STRING "Build type selections" FORCE)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "default build type")
+endif()
+project(kissnet_ci
+  LANGUAGES CXX
+  DESCRIPTION "header-only C++ network interface"
+  HOMEPAGE_URL https://github.com/Ybalrid/kissnet
+  VERSION 0.2.0)
 enable_testing()
 
 option(build_tests "build test programs" ON)
+
+# this helps linters e.g. Visual Studio Intellicode work properly
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 find_package(OpenSSL REQUIRED)
 
