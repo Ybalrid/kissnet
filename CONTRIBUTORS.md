@@ -1,4 +1,4 @@
-#Contributors
+# Contributors
 
 I would like to personally thank the following super nice people that submited patches with fixes and features to this project : 
 
