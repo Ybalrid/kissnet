@@ -7,7 +7,7 @@ project(kissnet_ci
   LANGUAGES CXX
   DESCRIPTION "header-only C++ network interface"
   HOMEPAGE_URL https://github.com/Ybalrid/kissnet
-  VERSION 0.2.0)
+  VERSION 0.1.0)
 enable_testing()
 
 option(build_tests "build test programs" ON)
@@ -15,14 +15,18 @@ option(build_tests "build test programs" ON)
 # this helps linters e.g. Visual Studio Intellicode work properly
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL)
 
 set(incdir ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(output kissnet.cpp)
 target_include_directories(output PRIVATE ${incdir})
-target_link_libraries(output PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 target_compile_features(output PRIVATE cxx_std_17)
+add_test(NAME HasOpenSSL COMMAND $<TARGET_FILE:output>)
+if(OpenSSL_FOUND)
+  target_link_libraries(output PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  target_compile_definitions(output PRIVATE KISSNET_USE_OPENSSL)
+endif()
 
 if(build_tests)
   add_subdirectory(examples)
