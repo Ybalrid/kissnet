@@ -16,7 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - run: cmake -B build
+    - run: cmake -B build -Dbuild_tests:BOOL=on
       env:
         CXX: g++-9
 
@@ -33,7 +33,7 @@ jobs:
 
     - run: brew install openssl
 
-    - run: cmake -B build -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
+    - run: cmake -B build -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -Dbuild_tests:BOOL=on
       env:
         CXX: g++-9
 
@@ -50,7 +50,7 @@ jobs:
 
       - run: cinst -y ninja openssl.light
 
-      - run: cmake -B build -G Ninja
+      - run: cmake -B build -G Ninja -Dbuild_tests:BOOL=on
 
       - run: cmake --build build --parallel
 

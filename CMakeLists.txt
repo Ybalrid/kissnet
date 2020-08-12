@@ -10,7 +10,7 @@ project(kissnet_ci
   VERSION 0.1.0)
 enable_testing()
 
-option(build_tests "build test programs" ON)
+option(build_tests "build test programs")
 
 # this helps linters e.g. Visual Studio Intellicode work properly
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
