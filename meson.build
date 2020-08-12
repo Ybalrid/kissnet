@@ -28,9 +28,9 @@ foreach t : ['tcp_echo_server']
 endforeach
 
 dir = 'tests/'
-foreach t : ['acceptor', 'endpoint', 'error_handler', 'simple']
+foreach t : ['acceptor', 'endpoint', 'error_handler', 'loopback_udp', 'simple']
   exe = executable(t, dir + t + '/main.cpp', dependencies: winlibs)
-  if ['endpoint', 'error_handler', 'simple'].contains(t)
+  if ['endpoint', 'error_handler', 'loopback_udp', 'simple'].contains(t)
     test(t, exe, timeout : 5)
   endif
 endforeach
