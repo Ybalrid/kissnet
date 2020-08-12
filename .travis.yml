@@ -1,26 +1,17 @@
-dist: trusty
-sudo: required
-language: cpp
-compiler: gcc
+dist: bionic
+language: python
+group: travis_latest
 
-before_install:
-  - sudo apt-get update
+before_script:
+- gcc -v && g++ -v && cmake --version
 
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-    packages:
-      - gcc-8
-      - g++-8
-      - cmake
+install:
+- pip install cmake
 
-  
 script:
-  - sudo ln -s /usr/bin/gcc-8 /usr/local/bin/gcc
-  - sudo ln -s /usr/bin/g++-8 /usr/local/bin/g++
-  - export CC=/usr/bin/gcc-8
-  - export CXX=/usr/bin/g++-8
-  - gcc -v && g++ -v && cmake --version
-  - cmake .
-  - make
+- cmake -B build -Dbuild_tests:BOOL=on -DCMAKE_BUILD_TYPE=RelWithDebInfo
+- cmake --build build
+
+after_script:
+- cd build
+- ctest --output-on-failure

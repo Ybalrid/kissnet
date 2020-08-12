@@ -1,0 +1,5 @@
+add_executable(socket_test main.cpp)
+find_package(Threads)
+if(Threads_FOUND)
+target_link_libraries(socket_test PRIVATE Threads::Threads)
+endif()

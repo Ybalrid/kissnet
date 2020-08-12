@@ -1,4 +1,10 @@
-# kissnet [![Build Status](https://travis-ci.com/Ybalrid/kissnet.svg?branch=master)](https://travis-ci.com/Ybalrid/kissnet) [![Build status](https://ci.appveyor.com/api/projects/status/rcay95ld21m7o8sv/branch/master?svg=true)](https://ci.appveyor.com/project/Ybalrid/kissnet/branch/master) [![Total alerts](https://img.shields.io/lgtm/alerts/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/alerts/) [![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/context:cpp) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+# kissnet
+[![Build Status](https://travis-ci.com/Ybalrid/kissnet.svg?branch=master)](https://travis-ci.com/Ybalrid/kissnet)
+[![Build status](https://ci.appveyor.com/api/projects/status/rcay95ld21m7o8sv/branch/master?svg=true)](https://ci.appveyor.com/project/Ybalrid/kissnet/branch/master)
+![ci](https://github.com/Ybalrid/kissnet/workflows/ci/badge.svg)
+[![Total alerts](https://img.shields.io/lgtm/alerts/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/alerts/)
+[![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/Ybalrid/kissnet.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Ybalrid/kissnet/context:cpp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **K**eep **I**t **S**imple **S**tupid **NET**work.
 
@@ -54,7 +60,7 @@ int main()
 {
 
     /* No need to initializate SSL because its initializated at start of program if KISSNET_USE_OPENSSL is used. */
-	
+
 	{
 		//Create a kissnet tcp over ssl ipv4 socket
 		kn::tcp_ssl_socket a_socket(kn::endpoint("cpz.github.io:443"));
@@ -85,7 +91,7 @@ int main()
 		//Print the raw data as text into the terminal (should display html/css code here)
 		std::cout << reinterpret_cast<const char*>(static_buffer.data()) << '\n';
 	}
-	
+
 	/* Nothing need to do for OpenSSL uninitialization because our class will do everything by himself. */
 
 	/*No more socket here, this will actually close WSA on Windows*/
