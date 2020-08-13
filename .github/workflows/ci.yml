@@ -56,3 +56,15 @@ jobs:
 
       - run: ctest --output-on-failure
         working-directory: build
+
+  msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: cmake -B build -Dbuild_tests:BOOL=on -DCMAKE_BUILD_TYPE=Debug
+
+      - run: cmake --build build --parallel
+
+      - run: ctest --output-on-failure -C Debug
+        working-directory: build
