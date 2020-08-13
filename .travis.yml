@@ -9,7 +9,7 @@ install:
 - pip install cmake
 
 script:
-- cmake -B build -Dbuild_tests:BOOL=on -DCMAKE_BUILD_TYPE=RelWithDebInfo
+- cmake -B build -Dkissnet_BUILD_TESTING:BOOL=on
 - cmake --build build
 
 after_script:
