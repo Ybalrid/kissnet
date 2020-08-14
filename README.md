@@ -41,9 +41,18 @@ kissnet should probably work "as is" on other UNIX platform.
 
 ## Short docs
 
+kissnet.hpp can be copied to your project's directory, or if you wish it can be installed and used from CMake as interface target `kissnet`:
+
+```sh
+cmake -B build
+cmake --install build
+```
+
+### Examples
+
 *Volontary contrived examples showing how the library looks like:*
 
-You can take a look a some of the programs in the `examples` directory
+You can take a look a some of the programs in the `examples` directory.
 
  * Basic client usage, tcp connect and read, udp send, udp read
 
