@@ -6,3 +6,4 @@ I would like to personally thank the following super nice people that submited p
 - Timothy Werquin [@timower](https://github.com/timower)
 - Michael Hirsch [@scivision](https://github.com/scivision)
 - [@kernelkinetic](https://github.com/kernelkinetic)
+- Kai Sommerfeld [@ksooo](https://github.com/ksooo)
