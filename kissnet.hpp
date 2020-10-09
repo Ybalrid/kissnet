@@ -298,6 +298,7 @@ namespace kissnet
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
@@ -352,6 +353,10 @@ inline int get_error_code()
 
 #endif //Kissnet use OpenSSL
 
+#ifndef SOL_TCP
+#define SOL_TCP IPPROTO_TCP
+#endif
+
 ///Main namespace of kissnet
 namespace kissnet
 {
@@ -396,6 +401,11 @@ namespace kissnet
 		v4,
 		v6
 	};
+
+	///File descriptor set types
+	static constexpr int fds_read = 0x1;
+	static constexpr int fds_write = 0x2;
+	static constexpr int fds_except = 0x4;
 
 	///buffer is an array of std::byte
 	template <size_t buff_size>
@@ -489,6 +499,12 @@ namespace kissnet
 		return ::socket(af, type, protocol);
 	};
 
+
+	///select()
+	inline auto syscall_select = [](int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout) {
+		return ::select(nfds, readfds, writefds, exceptfds, timeout);
+};
+
 	///recv()
 	inline auto syscall_recv = [](SOCKET s, char* buff, buffsize_t len, int flags) {
 		return ::recv(s, buff, len, flags);
@@ -527,7 +543,8 @@ namespace kissnet
 			errored = 0x0,
 			valid = 0x1,
 			cleanly_disconnected = 0x2,
-			non_blocking_would_have_blocked = 0x3
+			non_blocking_would_have_blocked = 0x3,
+			timed_out = 0x4
 
 			/* ... any other info on a "still valid socket" goes here ... */
 
@@ -857,6 +874,29 @@ namespace kissnet
 				kissnet_fatal_error("setting socket broadcast mode returned an error");
 		}
 
+		/// Set the socket option for TCPNoDelay
+		/// \param state By default "true". If put to false, it will disable TCPNoDelay
+		void set_tcp_no_delay(bool state = true) const
+		{
+			if constexpr (sock_proto == protocol::tcp)
+			{
+				const int tcpnodelay = state ? 1 : 0;
+				if (setsockopt(sock, SOL_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&tcpnodelay), sizeof(tcpnodelay)) != 0)
+					kissnet_fatal_error("setting socket tcpnodelay mode returned an error");
+			}
+		}
+
+		/// Get socket status
+		socket_status get_status() const
+		{
+			int sockerror = 0;
+			socklen_t errlen = sizeof(sockerror);
+			if (getsockopt(sock, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&sockerror), &errlen) != 0)
+				kissnet_fatal_error("getting socket error returned an error");
+
+			return sockerror == SOCKET_ERROR ? socket_status::errored : socket_status::valid;
+		}
+
 		///Bind socket locally using the address and port of the endpoint
 		void bind()
 		{
@@ -870,37 +910,52 @@ namespace kissnet
 		}
 
 		///(For TCP) connect to the endpoint as client
-		bool connect()
+		socket_status connect()
 		{
 			if constexpr (sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
 
 				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
 
-				return static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR);
+				int error = syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR));
+				if (error == SOCKET_ERROR)
+				{
+					const auto error = get_error_code();
+					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
+						return socket_status::non_blocking_would_have_blocked;
+
+					return socket_status::errored;
+				}
+				return socket_status::valid;
 			}
 #ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
 			{
 				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
 
-				if (!(static_cast<bool>(syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR)) != SOCKET_ERROR)))
-					return false;
+				int error = syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR));
+				if (error == SOCKET_ERROR)
+				{
+					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
+						return socket_status::non_blocking_would_have_blocked;
+
+					return socket_status::errored;
+				}
 
 				auto* pMethod = TLSv1_2_client_method();
 
 				pContext = SSL_CTX_new(pMethod);
 				pSSL = SSL_new(pContext);
 				if (!pSSL)
-					return false;
+					return socket_status::errored;
 
 				if (!(static_cast<bool>(SSL_set_fd(pSSL, sock))))
-					return false;
+					return socket_status::errored;
 
 				if (SSL_connect(pSSL) != 1)
-					return false;
+					return socket_status::errored;
 
-				return true;
+				return socket_status::valid;
 			}
 #endif
 		}
@@ -977,6 +1032,42 @@ namespace kissnet
 
 			if (getaddrinfo_results)
 				freeaddrinfo(getaddrinfo_results);
+		}
+
+		///Select socket with timeout
+		socket_status select(int fds, int64_t timeout)
+		{
+			fd_set fd_read, fd_write, fd_except;;
+			struct timeval tv;
+
+			tv.tv_sec = static_cast<long>(timeout / 1000);
+			tv.tv_usec = 1000 * static_cast<long>(timeout % 1000);
+
+			if (fds & fds_read)
+			{
+				FD_ZERO(&fd_read);
+				FD_SET(sock, &fd_read);
+			}
+			if (fds & fds_write)
+			{
+				FD_ZERO(&fd_write);
+				FD_SET(sock, &fd_write);
+			}
+			if (fds & fds_except)
+			{
+				FD_ZERO(&fd_except);
+				FD_SET(sock, &fd_except);
+			}
+
+			int ret = syscall_select(static_cast<int>(sock) + 1,
+															 fds & fds_read ? &fd_read : NULL,
+															 fds & fds_write ? &fd_write : NULL,
+															 fds & fds_except ? &fd_except : NULL, &tv);
+			if (ret == -1)
+				return socket_status::errored;
+			else if (ret == 0)
+				return socket_status::timed_out;
+			return socket_status::valid;
 		}
 
 		template <size_t buff_size>
@@ -1061,12 +1152,27 @@ namespace kissnet
 		}
 
 		///receive up-to len bytes inside the memory location pointed by buffer
-		bytes_with_status recv(std::byte* buffer, size_t len)
+		bytes_with_status recv(std::byte* buffer, size_t len, bool wait = true)
 		{
 			auto received_bytes = 0;
 			if constexpr (sock_proto == protocol::tcp)
 			{
-				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0);
+				int flags;
+				if (wait)
+					flags = MSG_WAITALL;
+				else
+				{
+#ifdef _WIN32
+					flags = 0; // MSG_DONTWAIT not avail on windows, need to make socket nonblockingto emulate
+					set_non_blocking(true);
+#else
+					flags = MSG_DONTWAIT;
+#endif
+				}
+				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), flags);
+#ifdef _WIN32
+				set_non_blocking(false);
+#endif
 			}
 
 #ifdef KISSNET_USE_OPENSSL
