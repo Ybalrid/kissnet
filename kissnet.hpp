@@ -139,6 +139,10 @@ using buffsize_t = int;
 
 #define AI_ADDRCONFIG 0x00000400
 
+#ifndef SHUT_RDWR
+#define SHUT_RDWR SD_BOTH
+#endif
+
 // taken from: https://github.com/rxi/dyad/blob/915ae4939529b9aaaf6ebfd2f65c6cff45fc0eac/src/dyad.c#L58
 inline const char* inet_ntop(int af, const void* src, char* dst, socklen_t size)
 {
@@ -503,7 +507,7 @@ namespace kissnet
 	///select()
 	inline auto syscall_select = [](int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout) {
 		return ::select(nfds, readfds, writefds, exceptfds, timeout);
-};
+	};
 
 	///recv()
 	inline auto syscall_recv = [](SOCKET s, char* buff, buffsize_t len, int flags) {
@@ -533,6 +537,11 @@ namespace kissnet
 	///accept()
 	inline auto syscall_accept = [](SOCKET s, struct sockaddr* addr, socklen_t* addrlen) {
 		return ::accept(s, addr, addrlen);
+	};
+
+	///shutdown()
+	inline auto syscall_shutdown = [](SOCKET s) {
+		return ::shutdown(s, SHUT_RDWR);
 	};
 
 	///Represent the status of a socket as returned by a socket operation (send, received). Implicitly convertible to bool
@@ -1023,6 +1032,14 @@ namespace kissnet
 			}
 
 			sock = INVALID_SOCKET;
+		}
+
+		void shutdown()
+		{
+			if (sock != INVALID_SOCKET)
+			{
+				syscall_shutdown(sock);
+			}
 		}
 
 		///Close socket on destruction
