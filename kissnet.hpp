@@ -51,8 +51,8 @@
  *  - port_t : a 16 bit unsigned number. Represent a network port number
  *  - endpoint : a structure that represent a location where you need to connect
  *  to. Contains a hostname (as std::string) and a port number (as port_t)
- *  - socket<protocol, ip> : a templated class that represent a socket. Protocol
- *  is either TCP or UDP, and ip is either v4 or v6
+ *  - socket<protocol> : a templated class that represents an ipv4 or ipv6 socket.
+ *  Protocol is either TCP or UDP
  *
  * Kissnet does error handling in 2 ways:
  *
@@ -400,12 +400,6 @@ namespace kissnet
 		udp
 	};
 
-	///Represent ipv4 vs ipv6
-	enum class ip {
-		v4,
-		v6
-	};
-
 	///File descriptor set types
 	static constexpr int fds_read = 0x1;
 	static constexpr int fds_write = 0x2;
@@ -669,7 +663,7 @@ namespace kissnet
 #endif
 
 	///Class that represent a socket
-	template <protocol sock_proto, ip ipver = ip::v4>
+	template <protocol sock_proto>
 	class socket
 	{
 		///Represent a number of bytes with a status information. Some of the methods of this class returns this.
@@ -693,8 +687,9 @@ namespace kissnet
 		addrinfo getaddrinfo_hints{};
 		addrinfo* getaddrinfo_results = nullptr;
 
-		void initialize_addrinfo(int& type, short& family)
+		void initialize_addrinfo()
 		{
+			int type{};
 			int iprotocol{};
 			if constexpr (sock_proto == protocol::tcp || sock_proto == protocol::tcp_ssl)
 			{
@@ -708,18 +703,8 @@ namespace kissnet
 				iprotocol = IPPROTO_UDP;
 			}
 
-			if constexpr (ipver == ip::v4)
-			{
-				family = AF_INET;
-			}
-
-			else if constexpr (ipver == ip::v6)
-			{
-				family = AF_INET6;
-			}
-
 			(void)memset(&getaddrinfo_hints, 0, sizeof getaddrinfo_hints);
-			getaddrinfo_hints.ai_family = family;
+			getaddrinfo_hints.ai_family = AF_UNSPEC;
 			getaddrinfo_hints.ai_socktype = type;
 			getaddrinfo_hints.ai_protocol = iprotocol;
 			getaddrinfo_hints.ai_flags = AI_ADDRCONFIG;
@@ -824,20 +809,23 @@ namespace kissnet
 			KISSNET_OS_INIT;
 
 			//Do we use streams or datagrams
-			int type;
-			short family;
-			initialize_addrinfo(type, family);
-
-			sock = syscall_socket(family, type, 0);
-			if (sock == INVALID_SOCKET)
-			{
-				kissnet_fatal_error("socket() syscall failed!");
-			}
+			initialize_addrinfo();
 
 			if (getaddrinfo(bind_loc.address.c_str(), std::to_string(bind_loc.port).c_str(), &getaddrinfo_hints, &getaddrinfo_results) != 0)
 			{
-				//TODO There can be more than one address to attempt to use in the getaddrinfo_results (It's a list). Try to go further down that list in error condition
 				kissnet_fatal_error("getaddrinfo failed!");
+			}
+
+			for (auto* addr = getaddrinfo_results; addr; addr = addr->ai_next)
+			{
+				sock = syscall_socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+				if (sock != INVALID_SOCKET)
+					break;
+			}
+
+			if (sock == INVALID_SOCKET)
+			{
+				kissnet_fatal_error("unable to craete socket!");
 			}
 
 			//Fill socket_input with 0s
@@ -850,10 +838,7 @@ namespace kissnet
 		{
 			KISSNET_OS_INIT;
 
-			short family;
-			int type;
-
-			initialize_addrinfo(type, family);
+			initialize_addrinfo();
 
 			//Fill socket_input with 0s
 			memset(static_cast<void*>(&socket_input), 0, sizeof socket_input);
@@ -1270,10 +1255,6 @@ namespace kissnet
 	using tcp_ssl_socket = socket<protocol::tcp_ssl>;
 	///Alias for socket<protocol::udp>
 	using udp_socket = socket<protocol::udp>;
-	///IPV6 version of a TCP socket
-	using tcp_socket_v6 = socket<protocol::tcp, ip::v6>;
-	///IPV6 version of an UDP socket
-	using udp_socket_v6 = socket<protocol::udp, ip::v6>;
 }
 
 //cleanup preprocessor macros
