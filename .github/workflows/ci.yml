@@ -3,8 +3,9 @@ name: ci
 on:
   push:
     paths:
-      - "**/*.cpp"
-      - "**/*.cmake"
+      - "**.cpp"
+      - "**.hpp"
+      - "**.cmake"
       - "**/CMakeLists.txt"
       - ".github/workflows/ci.yml"
 

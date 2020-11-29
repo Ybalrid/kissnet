@@ -52,5 +52,5 @@ if(PROJECT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 endif()
 
 include(FeatureSummary)
-add_feature_info(Tests build_tests "kissnet examples and tests")
+add_feature_info(Tests kissnet_BUILD_TESTING "kissnet examples and tests")
 feature_summary(WHAT ALL)
