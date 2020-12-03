@@ -927,7 +927,7 @@ namespace kissnet
 					return socket_status::errored;
 				}
 
-				auto* pMethod = TLSv1_2_client_method();
+				auto* pMethod = TLS_client_method();
 
 				pContext = SSL_CTX_new(pMethod);
 				pSSL = SSL_new(pContext);
