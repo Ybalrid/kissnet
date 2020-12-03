@@ -711,7 +711,6 @@ namespace kissnet
 		}
 
 		///sockaddr struct
-		sockaddr_storage socket_output = {};
 		sockaddr_storage socket_input = {};
 		socklen_t socket_input_socklen{};
 
@@ -737,7 +736,6 @@ namespace kissnet
 			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
 			bind_loc = std::move(other.bind_loc);
 			sock = std::move(other.sock);
-			socket_output = std::move(other.socket_output);
 			socket_input = std::move(other.socket_input);
 			socket_input_socklen = std::move(other.socket_input_socklen);
 			getaddrinfo_results = std::move(other.getaddrinfo_results);
@@ -766,7 +764,6 @@ namespace kissnet
 				KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
 				bind_loc = std::move(other.bind_loc);
 				sock = std::move(other.sock);
-				socket_output = std::move(other.socket_output);
 				socket_input = std::move(other.socket_input);
 				socket_input_socklen = std::move(other.socket_input_socklen);
 				getaddrinfo_results = std::move(other.getaddrinfo_results);
@@ -895,8 +892,6 @@ namespace kissnet
 		void bind()
 		{
 
-			memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
-
 			if (syscall_bind(sock, static_cast<SOCKADDR*>(getaddrinfo_results->ai_addr), socklen_t(getaddrinfo_results->ai_addrlen)) == SOCKET_ERROR)
 			{
 				kissnet_fatal_error("bind() failed\n");
@@ -909,9 +904,7 @@ namespace kissnet
 			if constexpr (sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
 
-				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
-
-				int error = syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR));
+				int error = syscall_connect(sock, getaddrinfo_results->ai_addr, socklen_t(getaddrinfo_results->ai_addrlen));
 				if (error == SOCKET_ERROR)
 				{
 					const auto error = get_error_code();
@@ -925,9 +918,7 @@ namespace kissnet
 #ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
 			{
-				memcpy(&socket_output, getaddrinfo_results->ai_addr, sizeof(SOCKADDR));
-
-				int error = syscall_connect(sock, reinterpret_cast<SOCKADDR*>(&socket_output), sizeof(SOCKADDR));
+				int error = syscall_connect(sock, getaddrinfo_results->ai_addr, socklen_t(getaddrinfo_results->ai_addrlen));
 				if (error == SOCKET_ERROR)
 				{
 					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
@@ -974,11 +965,11 @@ namespace kissnet
 				return { INVALID_SOCKET, {} };
 			}
 
-			SOCKADDR socket_address;
+			sockaddr_storage socket_address;
 			SOCKET s;
 			socklen_t size = sizeof socket_address;
 
-			if ((s = syscall_accept(sock, &socket_address, &size)) == INVALID_SOCKET)
+			if ((s = syscall_accept(sock, reinterpret_cast<SOCKADDR*>(&socket_address), &size)) == INVALID_SOCKET)
 			{
 
 				const auto error = get_error_code();
@@ -992,7 +983,7 @@ namespace kissnet
 				kissnet_fatal_error("accept() returned an invalid socket\n");
 			}
 
-			return { s, endpoint(&socket_address) };
+			return { s, endpoint(reinterpret_cast<SOCKADDR*>(&socket_address)) };
 		}
 
 		void close()
@@ -1095,7 +1086,6 @@ namespace kissnet
 #endif
 			else if constexpr (sock_proto == protocol::udp)
 			{
-				memcpy(&socket_output, getaddrinfo_results->ai_addr, getaddrinfo_results->ai_addrlen);
 				received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, static_cast<SOCKADDR*>(getaddrinfo_results->ai_addr), socklen_t(getaddrinfo_results->ai_addrlen));
 			}
 
