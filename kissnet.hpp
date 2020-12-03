@@ -673,7 +673,7 @@ namespace kissnet
 		KISSNET_OS_SPECIFIC;
 
 		///operatic-system type for a socket object
-		SOCKET sock;
+		SOCKET sock = INVALID_SOCKET;
 
 #ifdef KISSNET_USE_OPENSSL
 		SSL* pSSL = nullptr;
@@ -681,10 +681,10 @@ namespace kissnet
 #endif
 
 		///Location where this socket is bound
-		endpoint bind_loc;
+		endpoint bind_loc = {};
 
 		///Address information structures
-		addrinfo getaddrinfo_hints{};
+		addrinfo getaddrinfo_hints = {};
 		addrinfo* getaddrinfo_results = nullptr;
 		addrinfo* socket_addrinfo = nullptr;
 
@@ -713,16 +713,11 @@ namespace kissnet
 
 		///sockaddr struct
 		sockaddr_storage socket_input = {};
-		socklen_t socket_input_socklen{};
+		socklen_t socket_input_socklen = 0;
 
 	public:
 		///Construct an invalid socket
-		socket() :
-			sock{ INVALID_SOCKET },
-			getaddrinfo_hints(),
-			socket_input_socklen(0)
-		{
-		}
+		socket() = default;
 
 		///socket<> isn't copyable
 		socket(const socket&) = delete;
@@ -731,8 +726,7 @@ namespace kissnet
 		socket& operator=(const socket&) = delete;
 
 		///Move constructor. socket<> isn't copyable
-		socket(socket&& other) noexcept :
-			getaddrinfo_hints()
+		socket(socket&& other) noexcept
 		{
 			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
 			bind_loc = std::move(other.bind_loc);
@@ -757,10 +751,8 @@ namespace kissnet
 		///Move assign operation
 		socket& operator=(socket&& other) noexcept
 		{
-
 			if (this != &other)
 			{
-
 				if (!(sock < 0) || sock != INVALID_SOCKET)
 					closesocket(sock);
 
@@ -832,21 +824,15 @@ namespace kissnet
 			{
 				kissnet_fatal_error("unable to create socket!");
 			}
-
-			//Fill socket_input with 0s
-			socket_input = {};
 		}
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-			sock{ native_sock }, bind_loc(std::move(bind_to)), getaddrinfo_hints{}
+			sock{ native_sock }, bind_loc(std::move(bind_to))
 		{
 			KISSNET_OS_INIT;
 
 			initialize_addrinfo();
-
-			//Fill socket_input with 0s
-			socket_input = {};
 		}
 
 		///Set the socket in non blocking mode
@@ -899,7 +885,6 @@ namespace kissnet
 		///Bind socket locally using the address and port of the endpoint
 		void bind()
 		{
-
 			if (syscall_bind(sock, static_cast<SOCKADDR*>(socket_addrinfo->ai_addr), socklen_t(socket_addrinfo->ai_addrlen)) == SOCKET_ERROR)
 			{
 				kissnet_fatal_error("bind() failed\n");
@@ -911,7 +896,6 @@ namespace kissnet
 		{
 			if constexpr (sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
-
 				int error = syscall_connect(sock, socket_addrinfo->ai_addr, socklen_t(socket_addrinfo->ai_addrlen));
 				if (error == SOCKET_ERROR)
 				{
@@ -979,7 +963,6 @@ namespace kissnet
 
 			if ((s = syscall_accept(sock, reinterpret_cast<SOCKADDR*>(&socket_address), &size)) == INVALID_SOCKET)
 			{
-
 				const auto error = get_error_code();
 				switch (error)
 				{
@@ -1114,7 +1097,6 @@ namespace kissnet
 		template <size_t buff_size>
 		bytes_with_status recv(buffer<buff_size>& write_buff, size_t start_offset = 0)
 		{
-
 			auto received_bytes = 0;
 			if constexpr (sock_proto == protocol::tcp)
 			{
