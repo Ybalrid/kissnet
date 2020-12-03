@@ -14,6 +14,8 @@ option(kissnet_BUILD_TESTING "build test programs")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
+set(CI $ENV{CI})  # we'll use this to omit CI-shaky tests
+
 add_library(kissnet INTERFACE)
 add_library(kissnet::kissnet ALIAS kissnet)
 target_compile_features(kissnet INTERFACE cxx_std_17)
