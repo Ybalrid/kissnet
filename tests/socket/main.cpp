@@ -1,3 +1,5 @@
+// IPv4: ./socket 127.0.0.1 0.0.0.0
+// IPv6: ./socket ::1 ::
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -8,8 +10,14 @@
 using namespace std::chrono_literals;
 namespace kn = kissnet;
 
-int main()
+int main(int argc, char *argv[])
 {
+    std::string addr_send = "127.0.0.1";
+    if (argc > 1) addr_send = argv[1];
+
+    std::string addr_recv = "0.0.0.0";
+    if (argc > 2) addr_recv = argv[2];
+
 	{
 		//Create a kissnet TCP ipv4 socket
 		kn::tcp_socket a_socket(kn::endpoint("avalon.ybalrid.info:80"));
@@ -60,10 +68,10 @@ int main()
 
 	{
 		//Socket used to send, the "endpoint" is the destination of the data
-		kn::udp_socket a_socket(kn::endpoint("127.0.0.1", 6666));
+		kn::udp_socket a_socket(kn::endpoint(addr_send, 6666));
 
 		//Socket used to receive, the "endpoint" is where to listen to data
-		kn::udp_socket b_socket(kn::endpoint("0.0.0.0", 6666));
+		kn::udp_socket b_socket(kn::endpoint(addr_recv, 6666));
 		b_socket.bind();
 
 		//Byte buffer
@@ -142,5 +150,5 @@ int main()
 	std::cerr << "Every socket object used here has gone out of scope, Thanks to RAII, this will actually close WSA on Windows\n";
 
 	//So long, and thanks for all the fish
-	return 0;
+	return EXIT_SUCCESS;
 }
