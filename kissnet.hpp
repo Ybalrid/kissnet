@@ -686,6 +686,7 @@ namespace kissnet
 		///Address information structures
 		addrinfo getaddrinfo_hints{};
 		addrinfo* getaddrinfo_results = nullptr;
+		addrinfo* socket_addrinfo = nullptr;
 
 		void initialize_addrinfo()
 		{
@@ -703,7 +704,7 @@ namespace kissnet
 				iprotocol = IPPROTO_UDP;
 			}
 
-			(void)memset(&getaddrinfo_hints, 0, sizeof getaddrinfo_hints);
+			getaddrinfo_hints = {};
 			getaddrinfo_hints.ai_family = AF_UNSPEC;
 			getaddrinfo_hints.ai_socktype = type;
 			getaddrinfo_hints.ai_protocol = iprotocol;
@@ -739,6 +740,7 @@ namespace kissnet
 			socket_input = std::move(other.socket_input);
 			socket_input_socklen = std::move(other.socket_input_socklen);
 			getaddrinfo_results = std::move(other.getaddrinfo_results);
+			socket_addrinfo = std::move(other.socket_addrinfo);
 
 #ifdef KISSNET_USE_OPENSSL
 			pSSL = other.pSSL;
@@ -749,6 +751,7 @@ namespace kissnet
 
 			other.sock = INVALID_SOCKET;
 			other.getaddrinfo_results = nullptr;
+			other.socket_addrinfo = nullptr;
 		}
 
 		///Move assign operation
@@ -767,6 +770,7 @@ namespace kissnet
 				socket_input = std::move(other.socket_input);
 				socket_input_socklen = std::move(other.socket_input_socklen);
 				getaddrinfo_results = std::move(other.getaddrinfo_results);
+				socket_addrinfo = std::move(other.socket_addrinfo);
 
 #ifdef KISSNET_USE_OPENSSL
 				pSSL = other.pSSL;
@@ -777,6 +781,7 @@ namespace kissnet
 
 				other.sock = INVALID_SOCKET;
 				other.getaddrinfo_results = nullptr;
+				other.socket_addrinfo = nullptr;
 			}
 			return *this;
 		}
@@ -817,16 +822,19 @@ namespace kissnet
 			{
 				sock = syscall_socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 				if (sock != INVALID_SOCKET)
+				{
+					socket_addrinfo = addr;
 					break;
+				}
 			}
 
 			if (sock == INVALID_SOCKET)
 			{
-				kissnet_fatal_error("unable to craete socket!");
+				kissnet_fatal_error("unable to create socket!");
 			}
 
 			//Fill socket_input with 0s
-			memset(static_cast<void*>(&socket_input), 0, sizeof socket_input);
+			socket_input = {};
 		}
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
@@ -838,7 +846,7 @@ namespace kissnet
 			initialize_addrinfo();
 
 			//Fill socket_input with 0s
-			memset(static_cast<void*>(&socket_input), 0, sizeof socket_input);
+			socket_input = {};
 		}
 
 		///Set the socket in non blocking mode
@@ -892,7 +900,7 @@ namespace kissnet
 		void bind()
 		{
 
-			if (syscall_bind(sock, static_cast<SOCKADDR*>(getaddrinfo_results->ai_addr), socklen_t(getaddrinfo_results->ai_addrlen)) == SOCKET_ERROR)
+			if (syscall_bind(sock, static_cast<SOCKADDR*>(socket_addrinfo->ai_addr), socklen_t(socket_addrinfo->ai_addrlen)) == SOCKET_ERROR)
 			{
 				kissnet_fatal_error("bind() failed\n");
 			}
@@ -904,7 +912,7 @@ namespace kissnet
 			if constexpr (sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
 
-				int error = syscall_connect(sock, getaddrinfo_results->ai_addr, socklen_t(getaddrinfo_results->ai_addrlen));
+				int error = syscall_connect(sock, socket_addrinfo->ai_addr, socklen_t(socket_addrinfo->ai_addrlen));
 				if (error == SOCKET_ERROR)
 				{
 					const auto error = get_error_code();
@@ -918,7 +926,7 @@ namespace kissnet
 #ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
 			{
-				int error = syscall_connect(sock, getaddrinfo_results->ai_addr, socklen_t(getaddrinfo_results->ai_addrlen));
+				int error = syscall_connect(sock, socket_addrinfo->ai_addr, socklen_t(socket_addrinfo->ai_addrlen));
 				if (error == SOCKET_ERROR)
 				{
 					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
@@ -927,7 +935,7 @@ namespace kissnet
 					return socket_status::errored;
 				}
 
-				auto* pMethod = TLS_client_method();
+				auto* pMethod = TLSv1_2_client_method();
 
 				pContext = SSL_CTX_new(pMethod);
 				pSSL = SSL_new(pContext);
@@ -1086,7 +1094,7 @@ namespace kissnet
 #endif
 			else if constexpr (sock_proto == protocol::udp)
 			{
-				received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, static_cast<SOCKADDR*>(getaddrinfo_results->ai_addr), socklen_t(getaddrinfo_results->ai_addrlen));
+				received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, static_cast<SOCKADDR*>(socket_addrinfo->ai_addr), socklen_t(socket_addrinfo->ai_addrlen));
 			}
 
 			if (received_bytes < 0)
