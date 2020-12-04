@@ -8,7 +8,13 @@ on:
       - "**.cmake"
       - "**/CMakeLists.txt"
       - ".github/workflows/ci.yml"
-
+  pull_request:
+    paths:
+      - "**.cpp"
+      - "**.hpp"
+      - "**.cmake"
+      - "**/CMakeLists.txt"
+      - ".github/workflows/ci.yml"
 
 jobs:
 
@@ -27,16 +33,29 @@ jobs:
       working-directory: build
 
 
-  mac:
+  mac_gcc:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
 
-    - run: brew install openssl
-
-    - run: cmake -B build -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -Dkissnet_BUILD_TESTING:BOOL=on
+    - run: cmake -B build -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl@1.1/ -Dkissnet_BUILD_TESTING:BOOL=on
       env:
         CXX: g++-9
+
+    - run: cmake --build build --parallel
+
+    - run: ctest --output-on-failure
+      working-directory: build
+
+
+  mac_clang:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - run: cmake -B build -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl@1.1/ -Dkissnet_BUILD_TESTING:BOOL=on
+      env:
+        CXX: clang++
 
     - run: cmake --build build --parallel
 
@@ -57,6 +76,7 @@ jobs:
 
       - run: ctest --output-on-failure
         working-directory: build
+
 
   msvc:
     runs-on: windows-latest
