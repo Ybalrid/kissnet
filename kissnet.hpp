@@ -711,6 +711,74 @@ namespace kissnet
 			getaddrinfo_hints.ai_flags = AI_ADDRCONFIG;
 		}
 
+		///Create and connect to socket
+		socket_status connect(addrinfo* addr, int64_t timeout, bool createsocket)
+		{
+			if constexpr (sock_proto == protocol::tcp || sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
+			{
+				if (createsocket)
+				{
+					close();
+					socket_addrinfo = nullptr;
+					sock = syscall_socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+				}
+
+				if (sock == INVALID_SOCKET)
+					return socket_status::errored;
+
+				socket_addrinfo = addr;
+
+				if (timeout > 0)
+					set_non_blocking(true);
+
+				int error = syscall_connect(sock, addr->ai_addr, socklen_t(addr->ai_addrlen));
+				if (error == SOCKET_ERROR)
+				{
+					error = get_error_code();
+					if (error == EAGAIN || error == EINPROGRESS)
+					{
+						struct timeval tv;
+						tv.tv_sec = static_cast<long>(timeout / 1000);
+						tv.tv_usec = 1000 * static_cast<long>(timeout % 1000);
+
+						fd_set fd_write, fd_except;;
+						FD_ZERO(&fd_write);
+						FD_SET(sock, &fd_write);
+						FD_ZERO(&fd_except);
+						FD_SET(sock, &fd_except);
+
+						int ret = syscall_select(static_cast<int>(sock) + 1, NULL, &fd_write, &fd_except, &tv);
+						if (ret == -1)
+							error = get_error_code();
+						else if (ret == 0)
+							error = ETIMEDOUT;
+						else
+						{
+							socklen_t errlen = sizeof(error);
+							if (getsockopt(sock, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &errlen) != 0)
+								kissnet_fatal_error("getting socket error returned an error");
+						}
+					}
+				}
+
+				if (timeout > 0)
+					set_non_blocking(false);
+
+				if (error == 0)
+				{
+					return socket_status::valid;
+				}
+				else
+				{
+					close();
+					socket_addrinfo = nullptr;
+					return socket_status::errored;
+				}
+			}
+
+			kissnet_fatal_error("connect called for non-tcp socket");
+		}
+
 		///sockaddr struct
 		sockaddr_storage socket_input = {};
 		socklen_t socket_input_socklen = 0;
@@ -892,32 +960,50 @@ namespace kissnet
 		}
 
 		///(For TCP) connect to the endpoint as client
-		socket_status connect()
+		socket_status connect(int64_t timeout = 0)
 		{
 			if constexpr (sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
-				int error = syscall_connect(sock, socket_addrinfo->ai_addr, socklen_t(socket_addrinfo->ai_addrlen));
-				if (error == SOCKET_ERROR)
+				// try to connect to existing native socket, if any.
+				auto curr_addr = socket_addrinfo;
+				if (connect(curr_addr, timeout, false) != socket_status::valid)
 				{
-					const auto error = get_error_code();
-					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
-						return socket_status::non_blocking_would_have_blocked;
+					// try to create/connect native socket for one of the other addrinfo, if any
+					for (auto* addr = getaddrinfo_results; addr; addr = addr->ai_next)
+					{
+						if (addr == curr_addr)
+							continue; // already checked
 
-					return socket_status::errored;
+						if (connect(addr, timeout, true) == socket_status::valid)
+							break; // success
+					}
 				}
+
+				if (sock == INVALID_SOCKET)
+					kissnet_fatal_error("unable to create connectable socket!");
+
 				return socket_status::valid;
 			}
 #ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
 			{
-				int error = syscall_connect(sock, socket_addrinfo->ai_addr, socklen_t(socket_addrinfo->ai_addrlen));
-				if (error == SOCKET_ERROR)
+				// try to connect to existing native socket, if any.
+				auto curr_addr = socket_addrinfo;
+				if (connect(curr_addr, timeout, false) != socket_status::valid)
 				{
-					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
-						return socket_status::non_blocking_would_have_blocked;
+					// try to create/connect native socket for one of the other addrinfo, if any
+					for (auto* addr = getaddrinfo_results; addr; addr = addr->ai_next)
+					{
+						if (addr == curr_addr)
+							continue; // already checked
 
-					return socket_status::errored;
+						if (connect(addr, timeout, true) == socket_status::valid)
+							break; // success
+					}
 				}
+
+				if (sock == INVALID_SOCKET)
+					kissnet_fatal_error("unable to create connectable socket!");
 
 				auto* pMethod = TLSv1_2_client_method();
 
