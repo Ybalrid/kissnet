@@ -735,7 +735,7 @@ namespace kissnet
 				if (error == SOCKET_ERROR)
 				{
 					error = get_error_code();
-					if (error == EAGAIN || error == EINPROGRESS)
+					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
 					{
 						struct timeval tv;
 						tv.tv_sec = static_cast<long>(timeout / 1000);
