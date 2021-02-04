@@ -1021,6 +1021,9 @@ namespace kissnet
 				return socket_status::valid;
 			}
 #endif
+			else{
+                                return socket_status::errored;
+			}
 		}
 
 		///(for TCP= setup socket to listen to connection. Need to be called on binded socket, before being able to accept()
