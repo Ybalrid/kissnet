@@ -120,6 +120,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <ostream>
 
 #ifdef _WIN32
 
@@ -539,57 +540,27 @@ namespace kissnet
 	};
 
 	///Represent the status of a socket as returned by a socket operation (send, received). Implicitly convertible to bool
-	struct socket_status
-	{
-		///Enumeration of socket status, with a 1 byte footprint
-		enum values : int8_t {
+	enum class socket_status {
 			errored = 0x0,
 			valid = 0x1,
 			cleanly_disconnected = 0x2,
 			non_blocking_would_have_blocked = 0x3,
 			timed_out = 0x4
-
-			/* ... any other info on a "still valid socket" goes here ... */
-
-		};
-
-		///Actual value of the socket_status.
-		const values value;
-
-		///Use the default constructor
-		socket_status() :
-			value{ errored } {}
-
-		///Construct a "errored/valid" status for a true/false
-		explicit socket_status(bool state) :
-			value(values(state ? valid : errored)) {}
-
-		socket_status(values v) :
-			value(v) {}
-
-		///Copy socket status by default
-		socket_status(const socket_status&) = default;
-
-		///Move socket status by default
-		socket_status(socket_status&&) = default;
-
-		///implicitly convert this object to const bool (as the status should not change)
-		operator bool() const
-		{
-			//See the above enum: every value <= 0 correspond to an error, and will return false. Every value > 0 returns true
-			return value > 0;
-		}
-
-		int8_t get_value()
-		{
-			return value;
-		}
-
-		bool operator==(values v)
-		{
-			return v == value;
-		}
 	};
+
+	inline std::ostream& operator<<(std::ostream& os, const socket_status& s) {
+		switch (s)
+		{
+			case socket_status::errored: return os << "errored";
+			case socket_status::valid: return os << "valid";
+			case socket_status::cleanly_disconnected: return os << "cleanly_disconnected";
+			case socket_status::non_blocking_would_have_blocked: return os << "non_blocking_would_have_blocked";
+			case socket_status::timed_out: return os << "timed_out";
+			default:return os << "unknown";
+		}
+
+	}
+
 
 #ifdef KISSNET_USE_OPENSSL
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
