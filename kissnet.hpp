@@ -1317,8 +1317,10 @@ namespace kissnet
 
 	///Alias for socket<protocol::tcp>
 	using tcp_socket = socket<protocol::tcp>;
+#ifdef KISSNET_USE_OPENSSL
 	///Alias for socket<protocol::tcp_ssl>
 	using tcp_ssl_socket = socket<protocol::tcp_ssl>;
+#endif
 	///Alias for socket<protocol::udp>
 	using udp_socket = socket<protocol::udp>;
 }
