@@ -1005,7 +1005,12 @@ namespace kissnet
 				if (sock == INVALID_SOCKET)
 					kissnet_fatal_error("unable to create connectable socket!");
 
-				auto* pMethod = TLSv1_2_client_method();
+                auto* pMethod =
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+                TLSv1_2_client_method();
+#else
+                TLS_client_method();
+#endif
 
 				pContext = SSL_CTX_new(pMethod);
 				pSSL = SSL_new(pContext);
