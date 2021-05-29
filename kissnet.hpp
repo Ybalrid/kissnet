@@ -103,13 +103,12 @@
 #ifndef KISS_NET
 #define KISS_NET
 
- ///Define this to not use exceptions
+///Define this to not use exceptions
 #ifndef KISSNET_NO_EXCEP
 #define kissnet_fatal_error(STR) throw std::runtime_error(STR)
 #else
 #define kissnet_fatal_error(STR) kissnet::error::handle(STR);
 #endif
-
 
 #include <array>
 #include <memory>
@@ -135,7 +134,7 @@
 #include <windows.h>
 
 using ioctl_setting = u_long;
-using buffsize_t = int;
+using buffsize_t	= int;
 
 #define AI_ADDRCONFIG 0x00000400
 
@@ -202,33 +201,33 @@ namespace kissnet
 
 			///Startup
 			WSA() :
-				wsa_data{}
+			 wsa_data {}
 			{
 				if (const auto status = WSAStartup(MAKEWORD(2, 2), &wsa_data); status != 0)
 				{
 					std::string error_message;
 					switch (status) // https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-wsastartup#return-value
 					{
-					default:
-						error_message = "Unknown error happened.";
-						break;
-					case WSASYSNOTREADY:
-						error_message = "The underlying network subsystem is not ready for network communication.";
-						break;
-					case WSAVERNOTSUPPORTED: //unlikely, we specify 2.2!
-						error_message = " The version of Windows Sockets support requested "
-							"(2.2)" //we know here the version was 2.2, add that to the error message copied from MSDN
-							" is not provided by this particular Windows Sockets implementation. ";
-						break;
-					case WSAEINPROGRESS:
-						error_message = "A blocking Windows Sockets 1.1 operation is in progress.";
-						break;
-					case WSAEPROCLIM:
-						error_message = "A limit on the number of tasks supported by the Windows Sockets implementation has been reached.";
-						break;
-					case WSAEFAULT: //unlikely, if this ctor is running, wsa_data is part of this object's "stack" data
-						error_message = "The lpWSAData parameter is not a valid pointer.";
-						break;
+						default:
+							error_message = "Unknown error happened.";
+							break;
+						case WSASYSNOTREADY:
+							error_message = "The underlying network subsystem is not ready for network communication.";
+							break;
+						case WSAVERNOTSUPPORTED: //unlikely, we specify 2.2!
+							error_message = " The version of Windows Sockets support requested "
+											"(2.2)" //we know here the version was 2.2, add that to the error message copied from MSDN
+											" is not provided by this particular Windows Sockets implementation. ";
+							break;
+						case WSAEINPROGRESS:
+							error_message = "A blocking Windows Sockets 1.1 operation is in progress.";
+							break;
+						case WSAEPROCLIM:
+							error_message = "A limit on the number of tasks supported by the Windows Sockets implementation has been reached.";
+							break;
+						case WSAEFAULT: //unlikely, if this ctor is running, wsa_data is part of this object's "stack" data
+							error_message = "The lpWSAData parameter is not a valid pointer.";
+							break;
 					}
 					kissnet_fatal_error(error_message);
 				}
@@ -284,14 +283,14 @@ namespace kissnet
 		//We need to posixify the values that we are actually using inside this header.
 		switch (error)
 		{
-		case WSAEWOULDBLOCK:
-			return EWOULDBLOCK;
-		case WSAEBADF:
-			return EBADF;
-		case WSAEINTR:
-			return EINTR;
-		default:
-			return error;
+			case WSAEWOULDBLOCK:
+				return EWOULDBLOCK;
+			case WSAEBADF:
+				return EBADF;
+			case WSAEINTR:
+				return EINTR;
+			default:
+				return error;
 		}
 	}
 }
@@ -309,15 +308,15 @@ namespace kissnet
 #include <fcntl.h>
 
 using ioctl_setting = int;
-using buffsize_t = size_t;
+using buffsize_t	= size_t;
 
 //To get consistent socket API between Windows and Linux:
 static const int INVALID_SOCKET = -1;
-static const int SOCKET_ERROR = -1;
-using SOCKET = int;
-using SOCKADDR_IN = sockaddr_in;
-using SOCKADDR = sockaddr;
-using IN_ADDR = in_addr;
+static const int SOCKET_ERROR	= -1;
+using SOCKET					= int;
+using SOCKADDR_IN				= sockaddr_in;
+using SOCKADDR					= sockaddr;
+using IN_ADDR					= in_addr;
 
 //Wrap them in their WIN32 names
 inline int closesocket(SOCKET in)
@@ -346,7 +345,6 @@ inline int get_error_code()
 
 #endif //ifdef WIN32
 
-
 #ifdef KISSNET_USE_OPENSSL
 
 #include <openssl/ssl.h>
@@ -369,8 +367,8 @@ namespace kissnet
 	namespace error
 	{
 		static void (*callback)(const std::string&, void* ctx) = nullptr;
-		static void* ctx = nullptr;
-		static bool abortOnFatalError = true;
+		static void* ctx									   = nullptr;
+		static bool abortOnFatalError						   = true;
 
 		inline void handle(const std::string& str)
 		{
@@ -401,8 +399,8 @@ namespace kissnet
 	};
 
 	///File descriptor set types
-	static constexpr int fds_read = 0x1;
-	static constexpr int fds_write = 0x2;
+	static constexpr int fds_read	= 0x1;
+	static constexpr int fds_write	= 0x2;
 	static constexpr int fds_except = 0x4;
 
 	///buffer is an array of std::byte
@@ -416,18 +414,18 @@ namespace kissnet
 	struct endpoint
 	{
 		///The address to connect to
-		std::string address{};
+		std::string address {};
 
 		///The port to connect to
-		port_t port{};
+		port_t port {};
 
 		///Default constructor, the endpoint is not valid at that point, but you can set the address/port manually
 		endpoint() = default;
 
 		///Basically create the endpoint with what you give it
 		endpoint(std::string addr, port_t prt) :
-			address{ std::move(addr) }, port{ prt }
-		{}
+		 address { std::move(addr) }, port { prt }
+		{ }
 
 		static bool is_valid_port_number(unsigned long n)
 		{
@@ -465,24 +463,24 @@ namespace kissnet
 		{
 			switch (addr->sa_family)
 			{
-			case AF_INET: {
-				auto ip_addr = (SOCKADDR_IN*)(addr);
-				address = inet_ntoa(ip_addr->sin_addr);
-				port = ntohs(ip_addr->sin_port);
-			}
-						break;
+				case AF_INET: {
+					auto ip_addr = (SOCKADDR_IN*)(addr);
+					address		 = inet_ntoa(ip_addr->sin_addr);
+					port		 = ntohs(ip_addr->sin_port);
+				}
+				break;
 
-			case AF_INET6: {
-				auto ip_addr = (sockaddr_in6*)(addr);
-				char buffer[INET6_ADDRSTRLEN];
-				address = inet_ntop(AF_INET6, &(ip_addr->sin6_addr), buffer, INET6_ADDRSTRLEN);
-				port = ntohs(ip_addr->sin6_port);
-			}
-						 break;
+				case AF_INET6: {
+					auto ip_addr = (sockaddr_in6*)(addr);
+					char buffer[INET6_ADDRSTRLEN];
+					address = inet_ntop(AF_INET6, &(ip_addr->sin6_addr), buffer, INET6_ADDRSTRLEN);
+					port	= ntohs(ip_addr->sin6_port);
+				}
+				break;
 
-			default: {
-				kissnet_fatal_error("Trying to construct an endpoint for a protocol familly that is neither AF_INET or AF_INET6");
-			}
+				default: {
+					kissnet_fatal_error("Trying to construct an endpoint for a protocol familly that is neither AF_INET or AF_INET6");
+				}
 			}
 
 			if (address.empty())
@@ -496,7 +494,6 @@ namespace kissnet
 	inline auto syscall_socket = [](int af, int type, int protocol) {
 		return ::socket(af, type, protocol);
 	};
-
 
 	///select()
 	inline auto syscall_select = [](int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout) {
@@ -543,11 +540,11 @@ namespace kissnet
 	{
 		///Enumeration of socket status, with a 1 byte footprint
 		enum values : int8_t {
-			errored = 0x0,
-			valid = 0x1,
-			cleanly_disconnected = 0x2,
+			errored							= 0x0,
+			valid							= 0x1,
+			cleanly_disconnected			= 0x2,
 			non_blocking_would_have_blocked = 0x3,
-			timed_out = 0x4
+			timed_out						= 0x4
 
 			/* ... any other info on a "still valid socket" goes here ... */
 
@@ -558,14 +555,14 @@ namespace kissnet
 
 		///Use the default constructor
 		socket_status() :
-			value{ errored } {}
+		 value { errored } { }
 
 		///Construct a "errored/valid" status for a true/false
 		explicit socket_status(bool state) :
-			value(values(state ? valid : errored)) {}
+		 value(values(state ? valid : errored)) { }
 
 		socket_status(values v) :
-			value(v) {}
+		 value(v) { }
 
 		///Copy socket status by default
 		socket_status(const socket_status&) = default;
@@ -593,17 +590,17 @@ namespace kissnet
 
 #ifdef KISSNET_USE_OPENSSL
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-	static std::shared_ptr <std::vector< std::mutex > > SSL_lock_cs;
+	static std::shared_ptr<std::vector<std::mutex>> SSL_lock_cs;
 
 	class ThreadSafe_SSL
 	{
 	public:
 		ThreadSafe_SSL()
 		{
-			SSL_lock_cs = std::make_shared< std::vector < std::mutex > >( CRYPTO_num_locks() );
+			SSL_lock_cs = std::make_shared<std::vector<std::mutex>>(CRYPTO_num_locks());
 
 			CRYPTO_set_locking_callback((void (*)(int, int, const char*, int))
-				win32_locking_callback);
+											win32_locking_callback);
 		}
 
 		~ThreadSafe_SSL() { CRYPTO_set_locking_callback(nullptr); }
@@ -636,13 +633,11 @@ namespace kissnet
 			SSL_library_init();
 #else
 			OPENSSL_init_ssl(
-				OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL
-			);
+				OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
 
 			OPENSSL_init_crypto(
 				OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS,
-				nullptr
-			);
+				nullptr);
 #endif
 		}
 
@@ -676,7 +671,7 @@ namespace kissnet
 		SOCKET sock = INVALID_SOCKET;
 
 #ifdef KISSNET_USE_OPENSSL
-		SSL* pSSL = nullptr;
+		SSL* pSSL		  = nullptr;
 		SSL_CTX* pContext = nullptr;
 #endif
 
@@ -684,31 +679,31 @@ namespace kissnet
 		endpoint bind_loc = {};
 
 		///Address information structures
-		addrinfo getaddrinfo_hints = {};
+		addrinfo getaddrinfo_hints	  = {};
 		addrinfo* getaddrinfo_results = nullptr;
-		addrinfo* socket_addrinfo = nullptr;
+		addrinfo* socket_addrinfo	  = nullptr;
 
 		void initialize_addrinfo()
 		{
-			int type{};
-			int iprotocol{};
+			int type {};
+			int iprotocol {};
 			if constexpr (sock_proto == protocol::tcp || sock_proto == protocol::tcp_ssl)
 			{
-				type = SOCK_STREAM;
+				type	  = SOCK_STREAM;
 				iprotocol = IPPROTO_TCP;
 			}
 
 			else if constexpr (sock_proto == protocol::udp)
 			{
-				type = SOCK_DGRAM;
+				type	  = SOCK_DGRAM;
 				iprotocol = IPPROTO_UDP;
 			}
 
-			getaddrinfo_hints = {};
-			getaddrinfo_hints.ai_family = AF_UNSPEC;
+			getaddrinfo_hints			  = {};
+			getaddrinfo_hints.ai_family	  = AF_UNSPEC;
 			getaddrinfo_hints.ai_socktype = type;
 			getaddrinfo_hints.ai_protocol = iprotocol;
-			getaddrinfo_hints.ai_flags = AI_ADDRCONFIG;
+			getaddrinfo_hints.ai_flags	  = AI_ADDRCONFIG;
 		}
 
 		///Create and connect to socket
@@ -720,7 +715,7 @@ namespace kissnet
 				{
 					close();
 					socket_addrinfo = nullptr;
-					sock = syscall_socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+					sock			= syscall_socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 				}
 
 				if (sock == INVALID_SOCKET)
@@ -738,10 +733,11 @@ namespace kissnet
 					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
 					{
 						struct timeval tv;
-						tv.tv_sec = static_cast<long>(timeout / 1000);
+						tv.tv_sec  = static_cast<long>(timeout / 1000);
 						tv.tv_usec = 1000 * static_cast<long>(timeout % 1000);
 
-						fd_set fd_write, fd_except;;
+						fd_set fd_write, fd_except;
+						;
 						FD_ZERO(&fd_write);
 						FD_SET(sock, &fd_write);
 						FD_ZERO(&fd_except);
@@ -780,7 +776,7 @@ namespace kissnet
 		}
 
 		///sockaddr struct
-		sockaddr_storage socket_input = {};
+		sockaddr_storage socket_input  = {};
 		socklen_t socket_input_socklen = 0;
 
 	public:
@@ -797,23 +793,23 @@ namespace kissnet
 		socket(socket&& other) noexcept
 		{
 			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
-			bind_loc = std::move(other.bind_loc);
-			sock = std::move(other.sock);
-			socket_input = std::move(other.socket_input);
-			socket_input_socklen = std::move(other.socket_input_socklen);
-			getaddrinfo_results = std::move(other.getaddrinfo_results);
-			socket_addrinfo = std::move(other.socket_addrinfo);
+			bind_loc						 = std::move(other.bind_loc);
+			sock							 = std::move(other.sock);
+			socket_input					 = std::move(other.socket_input);
+			socket_input_socklen			 = std::move(other.socket_input_socklen);
+			getaddrinfo_results				 = std::move(other.getaddrinfo_results);
+			socket_addrinfo					 = std::move(other.socket_addrinfo);
 
 #ifdef KISSNET_USE_OPENSSL
-			pSSL = other.pSSL;
-			pContext = other.pContext;
-			other.pSSL = nullptr;
+			pSSL		   = other.pSSL;
+			pContext	   = other.pContext;
+			other.pSSL	   = nullptr;
 			other.pContext = nullptr;
 #endif
 
-			other.sock = INVALID_SOCKET;
+			other.sock				  = INVALID_SOCKET;
 			other.getaddrinfo_results = nullptr;
-			other.socket_addrinfo = nullptr;
+			other.socket_addrinfo	  = nullptr;
 		}
 
 		///Move assign operation
@@ -825,23 +821,23 @@ namespace kissnet
 					closesocket(sock);
 
 				KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
-				bind_loc = std::move(other.bind_loc);
-				sock = std::move(other.sock);
-				socket_input = std::move(other.socket_input);
-				socket_input_socklen = std::move(other.socket_input_socklen);
-				getaddrinfo_results = std::move(other.getaddrinfo_results);
-				socket_addrinfo = std::move(other.socket_addrinfo);
+				bind_loc						 = std::move(other.bind_loc);
+				sock							 = std::move(other.sock);
+				socket_input					 = std::move(other.socket_input);
+				socket_input_socklen			 = std::move(other.socket_input_socklen);
+				getaddrinfo_results				 = std::move(other.getaddrinfo_results);
+				socket_addrinfo					 = std::move(other.socket_addrinfo);
 
 #ifdef KISSNET_USE_OPENSSL
-				pSSL = other.pSSL;
-				pContext = other.pContext;
-				other.pSSL = nullptr;
+				pSSL		   = other.pSSL;
+				pContext	   = other.pContext;
+				other.pSSL	   = nullptr;
 				other.pContext = nullptr;
 #endif
 
-				other.sock = INVALID_SOCKET;
+				other.sock				  = INVALID_SOCKET;
 				other.getaddrinfo_results = nullptr;
-				other.socket_addrinfo = nullptr;
+				other.socket_addrinfo	  = nullptr;
 			}
 			return *this;
 		}
@@ -865,7 +861,7 @@ namespace kissnet
 
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
-			bind_loc{ std::move(bind_to) }
+		 bind_loc { std::move(bind_to) }
 		{
 			//operating system related housekeeping
 			KISSNET_OS_INIT;
@@ -896,7 +892,7 @@ namespace kissnet
 
 		///Construct a socket from an operating system socket, an additional endpoint to remember from where we are
 		socket(SOCKET native_sock, endpoint bind_to) :
-			sock{ native_sock }, bind_loc(std::move(bind_to))
+		 sock { native_sock }, bind_loc(std::move(bind_to))
 		{
 			KISSNET_OS_INIT;
 
@@ -911,7 +907,7 @@ namespace kissnet
 			ioctl_setting set = state ? 1 : 0;
 			if (ioctlsocket(sock, FIONBIO, &set) < 0)
 #else
-			const auto flags = fcntl(sock, F_GETFL, 0);
+			const auto flags	= fcntl(sock, F_GETFL, 0);
 			const auto newflags = state ? flags | O_NONBLOCK : flags ^ O_NONBLOCK;
 			if (fcntl(sock, F_SETFL, newflags) < 0)
 #endif
@@ -923,7 +919,7 @@ namespace kissnet
 		void set_broadcast(bool state = true) const
 		{
 			const int broadcast = state ? 1 : 0;
-			if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast)) != 0)
+			if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast)) != 0)
 				kissnet_fatal_error("setting socket broadcast mode returned an error");
 		}
 
@@ -942,7 +938,7 @@ namespace kissnet
 		/// Get socket status
 		socket_status get_status() const
 		{
-			int sockerror = 0;
+			int sockerror	 = 0;
 			socklen_t errlen = sizeof(sockerror);
 			if (getsockopt(sock, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&sockerror), &errlen) != 0)
 				kissnet_fatal_error("getting socket error returned an error");
@@ -1005,15 +1001,15 @@ namespace kissnet
 				if (sock == INVALID_SOCKET)
 					kissnet_fatal_error("unable to create connectable socket!");
 
-                auto* pMethod =
+				auto* pMethod =
 #if (OPENSSL_VERSION_NUMBER < 0x10100000L)
-                TLSv1_2_client_method();
+					TLSv1_2_client_method();
 #else
-                TLS_client_method();
+					TLS_client_method();
 #endif
 
 				pContext = SSL_CTX_new(pMethod);
-				pSSL = SSL_new(pContext);
+				pSSL	 = SSL_new(pContext);
 				if (!pSSL)
 					return socket_status::errored;
 
@@ -1057,9 +1053,9 @@ namespace kissnet
 				const auto error = get_error_code();
 				switch (error)
 				{
-				case EWOULDBLOCK: //if socket "would have blocked" from the call, ignore
-				case EINTR:		  //if blocking call got interrupted, ignore;
-					return {};
+					case EWOULDBLOCK: //if socket "would have blocked" from the call, ignore
+					case EINTR:		  //if blocking call got interrupted, ignore;
+						return {};
 				}
 
 				kissnet_fatal_error("accept() returned an invalid socket\n");
@@ -1080,7 +1076,7 @@ namespace kissnet
 						SSL_set_shutdown(pSSL, SSL_RECEIVED_SHUTDOWN | SSL_SENT_SHUTDOWN);
 						SSL_shutdown(pSSL);
 						SSL_free(pSSL);
-						if(pContext)
+						if (pContext)
 							SSL_CTX_free(pContext);
 					}
 				}
@@ -1112,10 +1108,11 @@ namespace kissnet
 		///Select socket with timeout
 		socket_status select(int fds, int64_t timeout)
 		{
-			fd_set fd_read, fd_write, fd_except;;
+			fd_set fd_read, fd_write, fd_except;
+			;
 			struct timeval tv;
 
-			tv.tv_sec = static_cast<long>(timeout / 1000);
+			tv.tv_sec  = static_cast<long>(timeout / 1000);
 			tv.tv_usec = 1000 * static_cast<long>(timeout % 1000);
 
 			if (fds & fds_read)
@@ -1135,9 +1132,10 @@ namespace kissnet
 			}
 
 			int ret = syscall_select(static_cast<int>(sock) + 1,
-															 fds & fds_read ? &fd_read : NULL,
-															 fds & fds_write ? &fd_write : NULL,
-															 fds & fds_except ? &fd_except : NULL, &tv);
+									 fds & fds_read ? &fd_read : NULL,
+									 fds & fds_write ? &fd_write : NULL,
+									 fds & fds_except ? &fd_except : NULL,
+									 &tv);
 			if (ret == -1)
 				return socket_status::errored;
 			else if (ret == 0)
@@ -1155,7 +1153,7 @@ namespace kissnet
 		///Send some bytes through the pipe
 		bytes_with_status send(const std::byte* read_buff, size_t length)
 		{
-			auto received_bytes{ 0 };
+			auto received_bytes { 0 };
 			if constexpr (sock_proto == protocol::tcp)
 			{
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
@@ -1303,7 +1301,7 @@ namespace kissnet
 		size_t bytes_available() const
 		{
 			static ioctl_setting size = 0;
-			const auto status = ioctlsocket(sock, FIONREAD, &size);
+			const auto status		  = ioctlsocket(sock, FIONREAD, &size);
 
 			if (status < 0)
 			{

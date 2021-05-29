@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
 	//Configuration (by default)
 	kn::port_t port = 12321;
 	//If specified : get port from command line
-	if(argc >= 2)
+	if (argc >= 2)
 	{
 		port = kn::port_t(strtoul(argv[1], nullptr, 10));
 	}
@@ -46,26 +46,26 @@ int main(int argc, char* argv[])
 	run_th.detach();
 
 	//Loop that continously accept connections
-	while(true)
+	while (true)
 	{
 		std::cout << "Waiting for a client on port " << port << '\n';
 		sockets.emplace_back(listen_socket.accept());
 		auto& sock = sockets.back();
 
 		//Create thread that will echo bytes received to the client
-		threads.emplace_back([&]{
+		threads.emplace_back([&] {
 			//Internal loop
 			bool continue_receiving = true;
 			//Static 1k buffer
 			kn::buffer<1024> buff;
 
 			//While connection is alive
-			while(continue_receiving)
+			while (continue_receiving)
 			{
 				//attept to receive data
-				if(auto [size, valid] = sock.recv(buff); valid)
+				if (auto [size, valid] = sock.recv(buff); valid)
 				{
-					if(valid.value == kn::socket_status::cleanly_disconnected)
+					if (valid.value == kn::socket_status::cleanly_disconnected)
 						continue_receiving = false;
 					else
 						sock.send(buff.data(), size);
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
 
 			//Now that we are outside the loop, erase this socket from the "sokets" list:
 			std::cout << "detected disconnect\n";
-			if(const auto me_iterator = std::find(sockets.begin(), sockets.end(), std::ref(sock)); me_iterator != sockets.end())
+			if (const auto me_iterator = std::find(sockets.begin(), sockets.end(), std::ref(sock)); me_iterator != sockets.end())
 			{
 				std::cout << "closing socket...\n";
 				sockets.erase(me_iterator);

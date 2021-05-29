@@ -17,8 +17,8 @@ void loopback_udp(const std::string send_address, const std::string recv_address
 	kn::buffer<16> buff;
 
 	//Build data to send (flat array of bytes
-	for(unsigned char i = 0; i < 16; i++)
-		buff[i] = std::byte{ i };
+	for (unsigned char i = 0; i < 16; i++)
+		buff[i] = std::byte { i };
 
 	//Send data
 	a_socket.send(buff.data(), 16);
@@ -31,12 +31,12 @@ void loopback_udp(const std::string send_address, const std::string recv_address
 
 	//You receive in the same way
 	auto [received_bytes, status] = b_socket.recv(recv_buff);
-	const auto from = b_socket.get_recv_endpoint();
+	const auto from				  = b_socket.get_recv_endpoint();
 
 	//Print the data
 	std::cout << "Received: ";
 
-	for(unsigned char i = 0; i < 16; i++)
+	for (unsigned char i = 0; i < 16; i++)
 	{
 		std::cout << std::hex << std::to_integer<int>(recv_buff[i]) << std::dec << ' ';
 	}
@@ -49,7 +49,7 @@ int main()
 {
 	loopback_udp("127.0.0.1", "0.0.0.0");
 	loopback_udp("::1", "::");
-	
+
 	//So long, and thanks for all the fish
 	return EXIT_SUCCESS;
 }

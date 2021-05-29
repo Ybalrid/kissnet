@@ -18,7 +18,7 @@ void acceptor(const std::string address)
 	const auto [size, status] = client.recv(buff);
 
 	//Add null terminator, and print as string
-	if(size < buff.size()) buff[size] = std::byte{ 0 };
+	if (size < buff.size()) buff[size] = std::byte { 0 };
 	std::cout << reinterpret_cast<const char*>(buff.data()) << '\n';
 }
 
@@ -26,7 +26,7 @@ int main()
 {
 	acceptor("0.0.0.0");
 	acceptor("::");
-	
+
 	//So long, and thanks for all the fish
 	return 0;
 }

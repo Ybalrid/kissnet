@@ -10,13 +10,13 @@
 using namespace std::chrono_literals;
 namespace kn = kissnet;
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    std::string addr_send = "127.0.0.1";
-    if (argc > 1) addr_send = argv[1];
+	std::string addr_send = "127.0.0.1";
+	if (argc > 1) addr_send = argv[1];
 
-    std::string addr_recv = "0.0.0.0";
-    if (argc > 2) addr_recv = argv[2];
+	std::string addr_recv = "0.0.0.0";
+	if (argc > 2) addr_recv = argv[2];
 
 	{
 		//Create a kissnet TCP ipv4 socket
@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 			const auto [data_size, socket_status] = a_socket.recv(static_buffer);
 
 			//To print it as a good old C string, add a null terminator
-			if(data_size < static_buffer.size())
+			if (data_size < static_buffer.size())
 				static_buffer[data_size] = std::byte { '\0' };
 
 			//Print the raw data as text into the terminal (should display html/css code here)
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 			const auto [data_size, socket_status] = a_socket.recv(heap_buffer.data(), heap_buffer.size());
 
 			//To print it as a good old C string, add a null terminator
-			if(data_size < heap_buffer.size())
+			if (data_size < heap_buffer.size())
 				heap_buffer[data_size] = std::byte { '\0' };
 
 			//Print the raw data as text into the terminal (should display html/css code here)
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 		kn::buffer<16> buff;
 
 		//Build data to send (flat array of bytes
-		for(unsigned char i = 0; i < 16; i++)
+		for (unsigned char i = 0; i < 16; i++)
 			buff[i] = std::byte { i };
 
 		//Send data
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 		//Print the data
 		std::cout << "Received: ";
 
-		for(unsigned char i = 0; i < 16; i++)
+		for (unsigned char i = 0; i < 16; i++)
 		{
 			std::cout << std::hex << std::to_integer<int>(recv_buff[i]) << std::dec << ' ';
 		}
@@ -132,10 +132,10 @@ int main(int argc, char *argv[])
 
 		quit_th.detach();
 
-		for(size_t i = 0; run && i < 50; ++i)
+		for (size_t i = 0; run && i < 50; ++i)
 		{
 			std::this_thread::sleep_for(100ms);
-			if(auto socket = listener.accept(); socket.is_valid())
+			if (auto socket = listener.accept(); socket.is_valid())
 			{
 				std::cout << "Accepted connect\n";
 				socket.send(hello_goodbye_byte, hello_goodbye_size);
