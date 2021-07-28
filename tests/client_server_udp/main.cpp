@@ -71,19 +71,21 @@ void server(const std::string& server_ip) {
     server_running = true;
     while (true) {
         sockaddr_storage from_who = {};
-        auto[received_bytes, status] = server_socket.recv(recv_buff, 0, &from_who);
+        socklen_t sock_size = 0;
+        auto[received_bytes, status] = server_socket.recv(recv_buff, 0, &from_who, &sock_size);
         if (!received_bytes || status != kissnet::socket_status::valid) {
             break;
         }
         std::cout << "Server got data" << std::endl;
         recv_buff[1] = static_cast<std::byte>(3);
-        server_socket.send(recv_buff, 16, reinterpret_cast<sockaddr*>(&from_who));
+        server_socket.send(recv_buff, 16, reinterpret_cast<sockaddr*>(&from_who), sock_size);
     }
     std::cout << "End server" << std::endl;
 }
 
 int main()
 {
+
     //Test IPv4
     std::thread ipv4_t1 (server, "0.0.0.0");
     std::thread ipv4_t2 (client_1, "127.0.0.1");
@@ -97,9 +99,11 @@ int main()
         return EXIT_FAILURE;
     }
 
-    //Test IPv6
+    server_running = false;
     client_1_fail = true;
     client_2_fail = true;
+
+    //Test IPv6
     std::thread ipv6_t1 (server, "::");
     std::thread ipv6_t2 (client_1, "::1");
     std::thread ipv6_t3 (client_2, "::1");
