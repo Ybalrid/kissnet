@@ -398,6 +398,12 @@ namespace kissnet
 		udp
 	};
 
+	///Address information structs
+	struct addr_collection {
+	    sockaddr_storage adrinf = {0};
+	    socklen_t sock_size = 0;
+	};
+
 	///File descriptor set types
 	static constexpr int fds_read	= 0x1;
 	static constexpr int fds_write	= 0x2;
@@ -781,6 +787,7 @@ namespace kissnet
 		socklen_t socket_input_socklen = 0;
 
 	public:
+
 		///Construct an invalid socket
 		socket() = default;
 
@@ -1145,14 +1152,14 @@ namespace kissnet
 		}
 
 		template <size_t buff_size>
-		bytes_with_status send(const buffer<buff_size>& buff, const size_t length = buff_size, sockaddr* dest_sock = nullptr, socklen_t dest_sock_len = 0)
+		bytes_with_status send(const buffer<buff_size>& buff, const size_t length = buff_size, addr_collection* addr = nullptr)
 		{
 			assert(buff_size >= length);
-			return send(buff.data(), length, dest_sock, dest_sock_len);
+			return send(buff.data(), length, addr);
 		}
 
 		///Send some bytes through the pipe
-		bytes_with_status send(const std::byte* read_buff, size_t length, sockaddr* dest_sock = nullptr, socklen_t dest_sock_len = 0)
+		bytes_with_status send(const std::byte* read_buff, size_t length, addr_collection* addr = nullptr)
 		{
 			auto received_bytes { 0 };
 			if constexpr (sock_proto == protocol::tcp)
@@ -1167,8 +1174,8 @@ namespace kissnet
 #endif
 			else if constexpr (sock_proto == protocol::udp)
 			{
-                if (dest_sock) {
-                    received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0,  dest_sock, dest_sock_len);
+			    if (addr) {
+			        received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, reinterpret_cast<sockaddr*>(&addr->adrinf) , addr->sock_size);
                 } else {
                     received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, static_cast<SOCKADDR*>(socket_addrinfo->ai_addr), socklen_t(socket_addrinfo->ai_addrlen));
                 }
@@ -1189,7 +1196,7 @@ namespace kissnet
 
 		///receive bytes inside the buffer, return the number of bytes you got. You can choose to write inside the buffer at a specific start offset (in number of bytes)
 		template <size_t buff_size>
-		bytes_with_status recv(buffer<buff_size>& write_buff, size_t start_offset = 0, sockaddr_storage* sock_info = nullptr, socklen_t* sock_len = nullptr)
+		bytes_with_status recv(buffer<buff_size>& write_buff, size_t start_offset = 0, addr_collection* addr_info = nullptr)
 		{
 			auto received_bytes = 0;
 			if constexpr (sock_proto == protocol::tcp)
@@ -1207,9 +1214,9 @@ namespace kissnet
 				socket_input_socklen = sizeof socket_input;
 
 				received_bytes = ::recvfrom(sock, reinterpret_cast<char*>(write_buff.data()) + start_offset, static_cast<buffsize_t>(buff_size - start_offset), 0, reinterpret_cast<sockaddr*>(&socket_input), &socket_input_socklen);
-                if (sock_info && sock_len) {
-                    *sock_info = socket_input;
-                    *sock_len = socket_input_socklen;
+				if (addr_info) {
+				    addr_info->adrinf = socket_input;
+				    addr_info->sock_size = socket_input_socklen;
                 }
 			}
 
@@ -1232,7 +1239,7 @@ namespace kissnet
 		}
 
 		///receive up-to len bytes inside the memory location pointed by buffer
-		bytes_with_status recv(std::byte* buffer, size_t len, bool wait = true, sockaddr_storage* sock_info = nullptr, socklen_t* sock_len = nullptr)
+		bytes_with_status recv(std::byte* buffer, size_t len, bool wait = true, addr_collection* addr_info = nullptr)
 		{
 			auto received_bytes = 0;
 			if constexpr (sock_proto == protocol::tcp)
@@ -1267,9 +1274,9 @@ namespace kissnet
 				socket_input_socklen = sizeof socket_input;
 
 				received_bytes = ::recvfrom(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), 0, reinterpret_cast<sockaddr*>(&socket_input), &socket_input_socklen);
-				if (sock_info && sock_len) {
-				    *sock_info = socket_input;
-                    *sock_len = socket_input_socklen;
+				if (addr_info) {
+				    addr_info->adrinf = socket_input;
+				    addr_info->sock_size = socket_input_socklen;
 				}
 			}
 
