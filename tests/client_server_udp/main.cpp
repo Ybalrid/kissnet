@@ -70,15 +70,14 @@ void server(const std::string& server_ip) {
     server_socket.bind();
     server_running = true;
     while (true) {
-        sockaddr_storage from_who = {};
-        socklen_t sock_size = 0;
-        auto[received_bytes, status] = server_socket.recv(recv_buff, 0, &from_who, &sock_size);
+        kissnet::addr_collection addr;
+        auto[received_bytes, status] = server_socket.recv(recv_buff, 0, &addr);
         if (!received_bytes || status != kissnet::socket_status::valid) {
             break;
         }
         std::cout << "Server got data" << std::endl;
         recv_buff[1] = static_cast<std::byte>(3);
-        server_socket.send(recv_buff, 16, reinterpret_cast<sockaddr*>(&from_who), sock_size);
+        server_socket.send(recv_buff, 16, &addr);
     }
     std::cout << "End server" << std::endl;
 }
