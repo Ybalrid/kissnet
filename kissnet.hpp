@@ -922,6 +922,15 @@ namespace kissnet
 				kissnet_fatal_error("setting socket to nonblock returned an error");
 		}
 
+		///Set the socket option for reuse of listening port
+		/// \param state By default "false". If put to true, it will enable reuse of listening port
+		void set_reuse(bool state = false) const
+		{
+			const int reuse = state ? 1 : 0;
+			if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse)) != 0)
+				kissnet_fatal_error("setting socket reuse mode returned an error");
+		}
+
 		///Set the socket option for broadcasts
 		/// \param state By default "true". If put to false, it will disable broadcasts
 		void set_broadcast(bool state = true) const
