@@ -502,11 +502,6 @@ namespace kissnet
 		return ::socket(af, type, protocol);
 	};
 
-	///setsockopt()
-	inline auto syscall_setsockopt = [](SOCKET s, int level, int optname, const void *optval, socklen_t optlen) {
-		return ::setsockopt(s, level, optname, optval, optlen);
-	};
-
 	///select()
 	inline auto syscall_select = [](int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout) {
 		return ::select(nfds, readfds, writefds, exceptfds, timeout);
@@ -932,7 +927,7 @@ namespace kissnet
 		void set_broadcast(bool state = true) const
 		{
 			const int broadcast = state ? 1 : 0;
-			if (syscall_setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast)) != 0)
+			if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast)) != 0)
 				kissnet_fatal_error("setting socket broadcast mode returned an error");
 		}
 
@@ -943,7 +938,7 @@ namespace kissnet
 			if constexpr (sock_proto == protocol::tcp)
 			{
 				const int tcpnodelay = state ? 1 : 0;
-				if (syscall_setsockopt(sock, SOL_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&tcpnodelay), sizeof(tcpnodelay)) != 0)
+				if (setsockopt(sock, SOL_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&tcpnodelay), sizeof(tcpnodelay)) != 0)
 					kissnet_fatal_error("setting socket tcpnodelay mode returned an error");
 			}
 		}
@@ -1018,7 +1013,7 @@ namespace kissnet
 					multicastRequest.imr_interface.s_addr = htonl(INADDR_ANY);
 				}
 
-				if (syscall_setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0)
+				if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0)
 				{
 					kissnet_fatal_error("setsockopt() failed\n");
 				}
@@ -1044,7 +1039,7 @@ namespace kissnet
 				}
 
 
-				if (syscall_setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0)
+				if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0)
 				{
 					kissnet_fatal_error("setsockopt() failed\n");
 				}
