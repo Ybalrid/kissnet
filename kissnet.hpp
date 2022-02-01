@@ -502,6 +502,11 @@ namespace kissnet
 		return ::socket(af, type, protocol);
 	};
 
+	///setsockopt()
+	inline auto syscall_setsockopt = [](SOCKET s, int level, int optname, const void *optval, socklen_t optlen) {
+		return ::setsockopt(s, level, optname, optval, optlen);
+	};
+
 	///select()
 	inline auto syscall_select = [](int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout) {
 		return ::select(nfds, readfds, writefds, exceptfds, timeout);
@@ -866,7 +871,7 @@ namespace kissnet
 		{
 			return is_valid();
 		}
-		
+
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
 		 bind_loc { std::move(bind_to) }
@@ -927,7 +932,7 @@ namespace kissnet
 		void set_broadcast(bool state = true) const
 		{
 			const int broadcast = state ? 1 : 0;
-			if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast)) != 0)
+			if (syscall_setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast), sizeof(broadcast)) != 0)
 				kissnet_fatal_error("setting socket broadcast mode returned an error");
 		}
 
@@ -938,7 +943,7 @@ namespace kissnet
 			if constexpr (sock_proto == protocol::tcp)
 			{
 				const int tcpnodelay = state ? 1 : 0;
-				if (setsockopt(sock, SOL_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&tcpnodelay), sizeof(tcpnodelay)) != 0)
+				if (syscall_setsockopt(sock, SOL_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&tcpnodelay), sizeof(tcpnodelay)) != 0)
 					kissnet_fatal_error("setting socket tcpnodelay mode returned an error");
 			}
 		}
@@ -964,23 +969,27 @@ namespace kissnet
 		}
 
         ///Join a multicast group
-        void join(endpoint multi_cast_endpoint)
+        void join(const endpoint& multi_cast_endpoint, const std::string& interface = "")
         {
+			if (sock_proto != protocol::udp)
+			{
+				kissnet_fatal_error("Joining a multicast is only possible in UDP mode\n");
+			}
 
 			addrinfo *multicast_addr;
 			addrinfo *local_addr;
-			addrinfo  hints          = { 0 };   /* Hints for name lookup */
+			addrinfo  hints = {0};
 			hints.ai_family = PF_UNSPEC;
 			hints.ai_flags  = AI_NUMERICHOST;
-			if ( getaddrinfo(multi_cast_endpoint.address.c_str(), nullptr, &hints, &multicast_addr) != 0 )
+			if (getaddrinfo(multi_cast_endpoint.address.c_str(), nullptr, &hints, &multicast_addr) != 0)
 			{
 				kissnet_fatal_error("getaddrinfo() failed\n");
 			}
 
 			hints.ai_family   = multicast_addr->ai_family;
 			hints.ai_socktype = SOCK_DGRAM;
-			hints.ai_flags    = AI_PASSIVE; /* Return an address we can bind to */
-			if ( getaddrinfo(nullptr, std::to_string(multi_cast_endpoint.port).c_str(), &hints, &local_addr) != 0 )
+			hints.ai_flags    = AI_PASSIVE;
+			if (getaddrinfo(nullptr, std::to_string(multi_cast_endpoint.port).c_str(), &hints, &local_addr) != 0)
 			{
 				kissnet_fatal_error("getaddrinfo() failed\n");
 			}
@@ -995,40 +1004,47 @@ namespace kissnet
 
 			bind();
 
-			if ( multicast_addr->ai_family  == PF_INET &&
-				multicast_addr->ai_addrlen == sizeof(struct sockaddr_in) ) /* IPv4 */
+			//IPv4
+			if (multicast_addr->ai_family  == PF_INET && multicast_addr->ai_addrlen == sizeof(struct sockaddr_in))
 			{
-				struct ip_mreq multicastRequest;  /* Multicast address join structure */
-
-				/* Specify the multicast group */
+				struct ip_mreq multicastRequest = {0};
 				memcpy(&multicastRequest.imr_multiaddr,
 					   &((struct sockaddr_in*)(multicast_addr->ai_addr))->sin_addr,
 					   sizeof(multicastRequest.imr_multiaddr));
 
-				/* Accept multicast from any interface */
-				multicastRequest.imr_interface.s_addr = htonl(INADDR_ANY);
+				if (interface.length()) {
+					multicastRequest.imr_interface.s_addr = inet_addr(interface.c_str());;
+				} else {
+					multicastRequest.imr_interface.s_addr = htonl(INADDR_ANY);
+				}
 
-				/* Join the multicast address */
-				if ( setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0 )
+				if (syscall_setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0)
 				{
 					kissnet_fatal_error("setsockopt() failed\n");
 				}
 			}
-			else if ( multicast_addr->ai_family  == PF_INET6 &&
-					 multicast_addr->ai_addrlen == sizeof(struct sockaddr_in6) ) /* IPv6 */
-			{
-				struct ipv6_mreq multicastRequest;  /* Multicast address join structure */
 
-				/* Specify the multicast group */
+			//IPv6
+			else if (multicast_addr->ai_family  == PF_INET6 && multicast_addr->ai_addrlen == sizeof(struct sockaddr_in6))
+			{
+				struct ipv6_mreq multicastRequest = {0};
 				memcpy(&multicastRequest.ipv6mr_multiaddr,
 					   &((struct sockaddr_in6*)(multicast_addr->ai_addr))->sin6_addr,
 					   sizeof(multicastRequest.ipv6mr_multiaddr));
 
-				/* Accept multicast from any interface */
-				multicastRequest.ipv6mr_interface = 0;
+				if (interface.length()) {
+					struct addrinfo *reslocal;
+					if (!getaddrinfo(interface.c_str(), nullptr, nullptr, &reslocal)){
+						kissnet_fatal_error("getaddrinfo() failed\n");
+					}
+					multicastRequest.ipv6mr_interface = ((sockaddr_in6 *)reslocal->ai_addr)->sin6_scope_id;
+					freeaddrinfo(reslocal);
+				} else {
+					multicastRequest.ipv6mr_interface = 0;
+				}
 
-				/* Join the multicast address */
-				if ( setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0 )
+
+				if (syscall_setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0)
 				{
 					kissnet_fatal_error("setsockopt() failed\n");
 				}
