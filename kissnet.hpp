@@ -867,6 +867,17 @@ namespace kissnet
 			return is_valid();
 		}
 
+		///Helper methods for IPv4/IPv6 detection
+		bool is_ip_v4(const std::string &rStr) {
+			sockaddr_in lsa{};
+			return inet_pton(AF_INET, rStr.c_str(), &(lsa.sin_addr)) != 0;
+		}
+
+		bool is_ip_v6(const std::string &rStr) {
+			sockaddr_in6 lsa{};
+			return inet_pton(AF_INET6, rStr.c_str(), &(lsa.sin6_addr)) != 0;
+		}
+
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
 		 bind_loc { std::move(bind_to) }
@@ -962,6 +973,84 @@ namespace kissnet
 				kissnet_fatal_error("bind() failed\n");
 			}
 		}
+
+        ///Join a multicast group
+        void join(endpoint multi_cast_endpoint)
+        {
+
+			addrinfo *multicast_addr;
+			addrinfo *local_addr;
+			addrinfo  hints          = { 0 };   /* Hints for name lookup */
+			hints.ai_family = PF_UNSPEC;
+			hints.ai_flags  = AI_NUMERICHOST;
+			if ( getaddrinfo(multi_cast_endpoint.address.c_str(), nullptr, &hints, &multicast_addr) != 0 )
+			{
+				kissnet_fatal_error("getaddrinfo() failed\n");
+			}
+
+			hints.ai_family   = multicast_addr->ai_family;
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_flags    = AI_PASSIVE; /* Return an address we can bind to */
+			if ( getaddrinfo(nullptr, std::to_string(multi_cast_endpoint.port).c_str(), &hints, &local_addr) != 0 )
+			{
+				kissnet_fatal_error("getaddrinfo() failed\n");
+			}
+
+			sock = syscall_socket(local_addr->ai_family, local_addr->ai_socktype, local_addr->ai_protocol);
+			if (sock != INVALID_SOCKET)
+			{
+				socket_addrinfo = local_addr;
+			} else {
+				kissnet_fatal_error("syscall_socket() failed\n");
+			}
+
+			bind();
+
+			if ( multicast_addr->ai_family  == PF_INET &&
+				multicast_addr->ai_addrlen == sizeof(struct sockaddr_in) ) /* IPv4 */
+			{
+				struct ip_mreq multicastRequest;  /* Multicast address join structure */
+
+				/* Specify the multicast group */
+				memcpy(&multicastRequest.imr_multiaddr,
+					   &((struct sockaddr_in*)(multicast_addr->ai_addr))->sin_addr,
+					   sizeof(multicastRequest.imr_multiaddr));
+
+				/* Accept multicast from any interface */
+				multicastRequest.imr_interface.s_addr = htonl(INADDR_ANY);
+
+				/* Join the multicast address */
+				if ( setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0 )
+				{
+					kissnet_fatal_error("setsockopt() failed\n");
+				}
+			}
+			else if ( multicast_addr->ai_family  == PF_INET6 &&
+					 multicast_addr->ai_addrlen == sizeof(struct sockaddr_in6) ) /* IPv6 */
+			{
+				struct ipv6_mreq multicastRequest;  /* Multicast address join structure */
+
+				/* Specify the multicast group */
+				memcpy(&multicastRequest.ipv6mr_multiaddr,
+					   &((struct sockaddr_in6*)(multicast_addr->ai_addr))->sin6_addr,
+					   sizeof(multicastRequest.ipv6mr_multiaddr));
+
+				/* Accept multicast from any interface */
+				multicastRequest.ipv6mr_interface = 0;
+
+				/* Join the multicast address */
+				if ( setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) != 0 )
+				{
+					kissnet_fatal_error("setsockopt() failed\n");
+				}
+			}
+			else
+			{
+				kissnet_fatal_error("Unknown AI family.\n");
+			}
+
+			freeaddrinfo(multicast_addr);
+        }
 
 		///(For TCP) connect to the endpoint as client
 		socket_status connect(int64_t timeout = 0)

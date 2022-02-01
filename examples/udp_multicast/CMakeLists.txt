@@ -1,0 +1,8 @@
+find_package(Threads)
+add_executable(udp_multicast main.cpp)
+if(Threads_FOUND)
+	target_link_libraries(udp_multicast PRIVATE Threads::Threads)
+endif()
+if(HAIKU)
+	target_link_libraries(udp_multicast PRIVATE network)
+endif(HAIKU)
