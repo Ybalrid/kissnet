@@ -16,7 +16,6 @@ void send_multicast_data(){
 	std::memcpy(send_this.data(), global_message.c_str(), global_message.size());
 
 	//Tell kissnet where to send the multicast packets
-
 	kissnet::udp_socket mcast_send_socket(kissnet::endpoint(global_mcast_addr, global_mcast_port));
 	while (global_thread_running) {
 		//Send the payload
