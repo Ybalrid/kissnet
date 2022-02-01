@@ -866,18 +866,7 @@ namespace kissnet
 		{
 			return is_valid();
 		}
-
-		///Helper methods for IPv4/IPv6 detection
-		bool is_ip_v4(const std::string &rStr) {
-			sockaddr_in lsa{};
-			return inet_pton(AF_INET, rStr.c_str(), &(lsa.sin_addr)) != 0;
-		}
-
-		bool is_ip_v6(const std::string &rStr) {
-			sockaddr_in6 lsa{};
-			return inet_pton(AF_INET6, rStr.c_str(), &(lsa.sin6_addr)) != 0;
-		}
-
+		
 		///Construct socket and (if applicable) connect to the endpoint
 		socket(endpoint bind_to) :
 		 bind_loc { std::move(bind_to) }
