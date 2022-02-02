@@ -968,7 +968,7 @@ namespace kissnet
         {
 			if (sock_proto != protocol::udp)
 			{
-				kissnet_fatal_error("Joining a multicast is only possible in UDP mode\n");
+				kissnet_fatal_error("joining a multicast is only possible in UDP mode\n");
 			}
 
 			addrinfo *multicast_addr;
@@ -1029,7 +1029,7 @@ namespace kissnet
 
 				if (interface.length()) {
 					struct addrinfo *reslocal;
-					if (!getaddrinfo(interface.c_str(), nullptr, nullptr, &reslocal)){
+					if (getaddrinfo(interface.c_str(), nullptr, nullptr, &reslocal)){
 						kissnet_fatal_error("getaddrinfo() failed\n");
 					}
 					multicastRequest.ipv6mr_interface = ((sockaddr_in6 *)reslocal->ai_addr)->sin6_scope_id;
@@ -1046,7 +1046,7 @@ namespace kissnet
 			}
 			else
 			{
-				kissnet_fatal_error("Unknown AI family.\n");
+				kissnet_fatal_error("unknown AI family.\n");
 			}
 
 			freeaddrinfo(multicast_addr);
