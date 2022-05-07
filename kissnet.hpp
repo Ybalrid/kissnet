@@ -584,12 +584,12 @@ namespace kissnet
 			return value > 0;
 		}
 
-		int8_t get_value()
+		int8_t get_value() const
 		{
 			return value;
 		}
 
-		bool operator==(values v)
+		bool operator==(values v) const
 		{
 			return v == value;
 		}
@@ -1404,6 +1404,7 @@ namespace kissnet
 			{
 				return { (sockaddr*)&socket_input };
 			}
+			return endpoint(nullptr);
 		}
 
 		///Return the number of bytes available inside the socket
