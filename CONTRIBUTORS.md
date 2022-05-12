@@ -9,3 +9,4 @@ I would like to personally thank the following super nice people that submited p
 - Kai Sommerfeld [@ksooo](https://github.com/ksooo)
 - Michael Marley [@mamarley](https://github.com/mamarley) 
 - Anders Cedronius [@andersc](https://github.com/andersc)
+- [@kauai68](https://github.com/kauai68)
