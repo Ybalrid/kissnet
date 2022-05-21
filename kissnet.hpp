@@ -1331,6 +1331,7 @@ namespace kissnet
 		bytes_with_status recv(std::byte* buffer, size_t len, bool wait = true, addr_collection* addr_info = nullptr)
 		{
 			auto received_bytes = 0;
+			int error = 0;
 			if constexpr (sock_proto == protocol::tcp)
 			{
 				int flags;
@@ -1347,6 +1348,8 @@ namespace kissnet
 				}
 				received_bytes = syscall_recv(sock, reinterpret_cast<char*>(buffer), static_cast<buffsize_t>(len), flags);
 #ifdef _WIN32
+				if(received_bytes < 0)
+					error = get_error_code();
 				set_non_blocking(false);
 #endif
 			}
@@ -1371,7 +1374,7 @@ namespace kissnet
 
 			if (received_bytes < 0)
 			{
-				const auto error = get_error_code();
+				error = error != 0 ? error : get_error_code();
 				if (error == EWOULDBLOCK)
 					return { 0, socket_status::non_blocking_would_have_blocked };
 				if (error == EAGAIN)
