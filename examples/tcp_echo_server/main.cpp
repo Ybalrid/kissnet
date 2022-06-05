@@ -20,11 +20,9 @@ int main(int argc, char* argv[])
 
 	//We need to store thread objects somewhere:
 	std::vector<std::thread> threads;
-	//We need to store socket objects somewhere
-	std::vector<kn::tcp_socket> sockets;
 
 	//Create a listening TCP socket on requested port
-	kn::tcp_socket listen_socket({ "0.0.0.0", port });
+	kn::tcp_socket& listen_socket = kn::tcp_socket::get({ "0.0.0.0", port });
 	listen_socket.bind();
 	listen_socket.listen();
 
@@ -49,44 +47,36 @@ int main(int argc, char* argv[])
 	while (true)
 	{
 		std::cout << "Waiting for a client on port " << port << '\n';
-		sockets.emplace_back(listen_socket.accept());
-		auto& sock = sockets.back();
+		listen_socket.accept([&](kn::tcp_socket& sock)
+		{
+			//Create thread that will echo bytes received to the client
+			threads.emplace_back([&] {
+				//Internal loop
+				bool continue_receiving = true;
+				//Static 1k buffer
+				kn::buffer<1024> buff;
 
-		//Create thread that will echo bytes received to the client
-		threads.emplace_back([&] {
-			//Internal loop
-			bool continue_receiving = true;
-			//Static 1k buffer
-			kn::buffer<1024> buff;
-
-			//While connection is alive
-			while (continue_receiving)
-			{
-				//attept to receive data
-				if (auto [size, valid] = sock.recv(buff); valid)
+				//While connection is alive
+				while (continue_receiving)
 				{
-					if (valid.value == kn::socket_status::cleanly_disconnected)
-						continue_receiving = false;
+					//attept to receive data
+					if (auto [size, valid] = sock.recv(buff); valid)
+					{
+						if (valid.value == kn::socket_status::cleanly_disconnected)
+							continue_receiving = false;
+						else
+							sock.send(buff.data(), size);
+					}
+					//If not valid remote host closed conection
 					else
-						sock.send(buff.data(), size);
+					{
+						continue_receiving = false;
+					}
 				}
-				//If not valid remote host closed conection
-				else
-				{
-					continue_receiving = false;
-				}
-			}
+			});
 
-			//Now that we are outside the loop, erase this socket from the "sokets" list:
-			std::cout << "detected disconnect\n";
-			if (const auto me_iterator = std::find(sockets.begin(), sockets.end(), std::ref(sock)); me_iterator != sockets.end())
-			{
-				std::cout << "closing socket...\n";
-				sockets.erase(me_iterator);
-			}
+			threads.back().detach();
 		});
-
-		threads.back().detach();
 	}
 
 	return 0;
