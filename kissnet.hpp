@@ -110,6 +110,7 @@
 #define kissnet_fatal_error(STR) kissnet::error::handle(STR);
 #endif
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <cstddef>
@@ -1222,14 +1223,20 @@ namespace kissnet
 				freeaddrinfo(getaddrinfo_results);
 		}
 
-		///Select socket with timeout
+		///Select the given vector of sockets with a timeout, with the first socket
+		///being the listening socket, and all other - accepted connections sockets
 		template<
 			typename socket_handle_new_func,
 			typename socket_handle_existing_func>
-		socket_status select(int fds, int64_t timeout,
+		static socket_status select(
+			std::vector<std::reference_wrapper<socket<sock_proto> > >& sockets,
+			int fds, int64_t timeout,
 			socket_handle_new_func&& socket_handle_new,
 			socket_handle_existing_func&& socket_handle_existing)
 		{
+			if (!sockets.size())
+				return socket_status::valid;
+
 			fd_set fd_read, fd_write, fd_except;
 			;
 			struct timeval tv;
@@ -1240,20 +1247,27 @@ namespace kissnet
 			if (fds & fds_read)
 			{
 				FD_ZERO(&fd_read);
-				FD_SET(sock, &fd_read);
+				for (auto socket : sockets)
+					FD_SET(socket.get().sock, &fd_read);
 			}
 			if (fds & fds_write)
 			{
 				FD_ZERO(&fd_write);
-				FD_SET(sock, &fd_write);
+				for (auto socket : sockets)
+					FD_SET(socket.get().sock, &fd_write);
 			}
 			if (fds & fds_except)
 			{
 				FD_ZERO(&fd_except);
-				FD_SET(sock, &fd_except);
+				for (auto socket : sockets)
+					FD_SET(socket.get().sock, &fd_except);
 			}
 
-			int highestFileDescriptor = static_cast<int>(sock);
+			int highestFileDescriptor = static_cast<int>(std::max_element(
+				sockets.begin(), sockets.end(), [] (const socket& lhs, const socket& rhs)
+			{
+				return lhs.sock < rhs.sock;
+			})->get().sock);
 			int ret = syscall_select(highestFileDescriptor + 1,
 				fds & fds_read ? &fd_read : NULL,
 				fds & fds_write ? &fd_write : NULL,
@@ -1267,6 +1281,7 @@ namespace kissnet
 
 			if (fds & fds_read)
 			{
+				auto sock = sockets[0].get().sock;
 				for (int i = 0; i <= highestFileDescriptor; i++)
 				{
 					if (!FD_ISSET(i, &fd_read))
@@ -1275,7 +1290,7 @@ namespace kissnet
 					if (i == sock)
 						socket_handle_new();
 					else
-						socket_handle_existing(*sockets[i]);
+						socket_handle_existing(*kissnet::socket<sock_proto>::sockets[i]);
 				}
 			}
 
@@ -1298,6 +1313,8 @@ namespace kissnet
 #ifdef _WIN32
 				int flags = 0;
 #else
+				// Do not issue SIGPIPE signal on Linux in case of abnormal
+				// client disconnect, making behavior the same as in Windows.
 				int flags = MSG_NOSIGNAL;
 #endif
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), flags);
