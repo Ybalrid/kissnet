@@ -1295,7 +1295,12 @@ namespace kissnet
 			auto received_bytes { 0 };
 			if constexpr (sock_proto == protocol::tcp)
 			{
-				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0);
+#ifdef _WIN32
+				int flags = 0;
+#else
+				int flags = MSG_NOSIGNAL;
+#endif
+				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), flags);
 			}
 #ifdef KISSNET_USE_OPENSSL
 			else if constexpr (sock_proto == protocol::tcp_ssl)
