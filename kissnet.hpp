@@ -886,8 +886,8 @@ namespace kissnet
 			if (i == sockets.end())
 			{
 				auto s = new socket(native_sock, bind_to);
-				i->second = s;
-				return *i->second;
+				sockets.emplace(s->sock, s);
+				return *sockets.at(s->sock);
 			}
 
 			// Cannot re-initialize a valid socket - throw exception.
@@ -978,9 +978,9 @@ namespace kissnet
 			}
 		}
 
-        ///Join a multicast group
-        void join(const endpoint& multi_cast_endpoint, const std::string& interface = "")
-        {
+		///Join a multicast group
+		void join(const endpoint& multi_cast_endpoint, const std::string& interface = "")
+		{
 			if (sock_proto != protocol::udp)
 			{
 				kissnet_fatal_error("joining a multicast is only possible in UDP mode\n");
@@ -1065,7 +1065,7 @@ namespace kissnet
 			}
 
 			freeaddrinfo(multicast_addr);
-        }
+		}
 
 		///(For TCP) connect to the endpoint as client
 		socket_status connect(int64_t timeout = 0)
