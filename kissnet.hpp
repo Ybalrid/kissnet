@@ -902,6 +902,8 @@ namespace kissnet
 			return *i->second;
 		}
 
+		SOCKET native_sock() const { return sock; }
+
 		///Return true if socket is valid. If this is false, you probably shouldn't attempt to send/receive anything, it will probably explode in your face!
 		bool is_valid() const
 		{
