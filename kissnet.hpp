@@ -116,6 +116,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cassert>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -786,8 +787,6 @@ namespace kissnet
 		sockaddr_storage socket_input  = {};
 		socklen_t socket_input_socklen = 0;
 
-	public:
-
 		///Construct an invalid socket
 		socket() = default;
 
@@ -796,29 +795,6 @@ namespace kissnet
 
 		///socket<> isn't copyable
 		socket& operator=(const socket&) = delete;
-
-		///Move constructor. socket<> isn't copyable
-		socket(socket&& other) noexcept
-		{
-			KISSNET_OS_SPECIFIC_PAYLOAD_NAME = std::move(other.KISSNET_OS_SPECIFIC_PAYLOAD_NAME);
-			bind_loc						 = std::move(other.bind_loc);
-			sock							 = std::move(other.sock);
-			socket_input					 = std::move(other.socket_input);
-			socket_input_socklen			 = std::move(other.socket_input_socklen);
-			getaddrinfo_results				 = std::move(other.getaddrinfo_results);
-			socket_addrinfo					 = std::move(other.socket_addrinfo);
-
-#ifdef KISSNET_USE_OPENSSL
-			pSSL		   = other.pSSL;
-			pContext	   = other.pContext;
-			other.pSSL	   = nullptr;
-			other.pContext = nullptr;
-#endif
-
-			other.sock				  = INVALID_SOCKET;
-			other.getaddrinfo_results = nullptr;
-			other.socket_addrinfo	  = nullptr;
-		}
 
 		///Move assign operation
 		socket& operator=(socket&& other) noexcept
@@ -848,23 +824,6 @@ namespace kissnet
 				other.socket_addrinfo	  = nullptr;
 			}
 			return *this;
-		}
-
-		///Return true if the underlying OS provided socket representation (file descriptor, handle...). Both socket are pointing to the same thing in this case
-		bool operator==(const socket& other) const
-		{
-			return sock == other.sock;
-		}
-
-		///Return true if socket is valid. If this is false, you probably shouldn't attempt to send/receive anything, it will probably explode in your face!
-		bool is_valid() const
-		{
-			return sock != INVALID_SOCKET;
-		}
-
-		inline operator bool() const
-		{
-			return is_valid();
 		}
 
 		///Construct socket and (if applicable) connect to the endpoint
@@ -905,6 +864,53 @@ namespace kissnet
 			KISSNET_OS_INIT;
 
 			initialize_addrinfo();
+		}
+
+		static std::map<SOCKET, socket*> sockets;
+
+	public:
+
+		///Get a socket and (if applicable) connect to the endpoint
+		static socket& get(endpoint bind_to)
+		{
+			auto s = new socket(bind_to);
+			sockets.emplace(s->sock, s);
+			return *sockets.at(s->sock);
+		}
+		
+		///Get a socket from an operating system socket, an additional endpoint to remember from where we are
+		static socket& get(SOCKET native_sock, endpoint bind_to)
+		{
+			// Create non-existing socket right away.
+			auto i = sockets.find(native_sock);
+			if (i == sockets.end())
+			{
+				auto s = new socket(native_sock, bind_to);
+				i->second = s;
+				return *i->second;
+			}
+
+			// Cannot re-initialize a valid socket - throw exception.
+			if (i->second->is_valid())
+			{
+				kissnet_fatal_error("cannot re-initialize a valid socket, it must be closed first");
+			}
+
+			// Rewrite invalid socket with a requested one.
+			auto s = new socket(native_sock, bind_to);
+			i->second = s;
+			return *i->second;
+		}
+
+		///Return true if socket is valid. If this is false, you probably shouldn't attempt to send/receive anything, it will probably explode in your face!
+		bool is_valid() const
+		{
+			return sock != INVALID_SOCKET;
+		}
+
+		inline operator bool() const
+		{
+			return is_valid();
 		}
 
 		///Set the socket in non blocking mode
@@ -1143,11 +1149,12 @@ namespace kissnet
 		}
 
 		///(for TCP) Wait for incoming connection, return socket connect to the client. Blocking.
-		socket accept()
+		template<typename socket_handle_new_func>
+		socket_status accept(socket_handle_new_func&& socket_handle_new)
 		{
 			if constexpr (sock_proto != protocol::tcp)
 			{
-				return { INVALID_SOCKET, {} };
+				kissnet_fatal_error("accept() is only possible for a tcp socket\n");
 			}
 
 			sockaddr_storage socket_address;
@@ -1161,13 +1168,15 @@ namespace kissnet
 				{
 					case EWOULDBLOCK: //if socket "would have blocked" from the call, ignore
 					case EINTR:		  //if blocking call got interrupted, ignore;
-						return {};
+						return socket_status::non_blocking_would_have_blocked;
 				}
 
 				kissnet_fatal_error("accept() returned an invalid socket\n");
 			}
 
-			return { s, endpoint(reinterpret_cast<SOCKADDR*>(&socket_address)) };
+			socket_handle_new(get(s, endpoint(reinterpret_cast<SOCKADDR*>(&socket_address))));
+
+			return socket_status::valid;
 		}
 
 		void close()
@@ -1212,7 +1221,12 @@ namespace kissnet
 		}
 
 		///Select socket with timeout
-		socket_status select(int fds, int64_t timeout)
+		template<
+			typename socket_handle_new_func,
+			typename socket_handle_existing_func>
+		socket_status select(int fds, int64_t timeout,
+			socket_handle_new_func&& socket_handle_new,
+			socket_handle_existing_func&& socket_handle_existing)
 		{
 			fd_set fd_read, fd_write, fd_except;
 			;
@@ -1237,15 +1251,32 @@ namespace kissnet
 				FD_SET(sock, &fd_except);
 			}
 
-			int ret = syscall_select(static_cast<int>(sock) + 1,
-									 fds & fds_read ? &fd_read : NULL,
-									 fds & fds_write ? &fd_write : NULL,
-									 fds & fds_except ? &fd_except : NULL,
-									 &tv);
+			int highestFileDescriptor = static_cast<int>(sock);
+			int ret = syscall_select(highestFileDescriptor + 1,
+				fds & fds_read ? &fd_read : NULL,
+				fds & fds_write ? &fd_write : NULL,
+				fds & fds_except ? &fd_except : NULL,
+				&tv);
+
 			if (ret == -1)
 				return socket_status::errored;
 			else if (ret == 0)
 				return socket_status::timed_out;
+
+			if (fds & fds_read)
+			{
+				for (int i = 0; i <= highestFileDescriptor; i++)
+				{
+					if (!FD_ISSET(i, &fd_read))
+						continue;
+
+					if (i == sock)
+						socket_handle_new();
+					else
+						socket_handle_existing(*sockets[i]);
+				}
+			}
+
 			return socket_status::valid;
 		}
 

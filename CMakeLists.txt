@@ -16,21 +16,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 set(CI $ENV{CI})  # we'll use this to omit CI-shaky tests
 
-add_library(kissnet INTERFACE)
+add_library(kissnet STATIC kissnet.cpp)
 add_library(kissnet::kissnet ALIAS kissnet)
 target_compile_features(kissnet INTERFACE cxx_std_17)
 target_include_directories(kissnet INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+set_property(TARGET kissnet PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 find_package(OpenSSL)
 
-add_executable(minimal kissnet.cpp)
-add_test(NAME HasOpenSSL COMMAND $<TARGET_FILE:minimal>)
-target_link_libraries(minimal PRIVATE kissnet)
 if(OpenSSL_FOUND)
-  target_link_libraries(minimal PRIVATE OpenSSL::SSL OpenSSL::Crypto)
-  target_compile_definitions(minimal PRIVATE KISSNET_USE_OPENSSL)
+  target_link_libraries(kissnet PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  target_compile_definitions(kissnet PRIVATE KISSNET_USE_OPENSSL)
 endif()
 
 if(kissnet_BUILD_TESTING)
