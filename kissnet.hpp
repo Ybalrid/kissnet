@@ -1298,25 +1298,27 @@ namespace kissnet
 		}
 
 		template <size_t buff_size>
-		bytes_with_status send(const buffer<buff_size>& buff, const size_t length = buff_size, addr_collection* addr = nullptr)
+		bytes_with_status send(const buffer<buff_size>& buff, const size_t length = buff_size, bool wait = true, addr_collection* addr = nullptr)
 		{
 			assert(buff_size >= length);
-			return send(buff.data(), length, addr);
+			return send(buff.data(), length, wait, addr);
 		}
 
 		///Send some bytes through the pipe
-		bytes_with_status send(const std::byte* read_buff, size_t length, addr_collection* addr = nullptr)
+		bytes_with_status send(const std::byte* read_buff, size_t length, bool wait = true, addr_collection* addr = nullptr)
 		{
+#ifdef _WIN32
+			int flags = 0;
+#else
+			// Do not issue SIGPIPE signal on Linux in case of abnormal
+			// client disconnect, making behavior the same as in Windows.
+			int flags = MSG_NOSIGNAL;
+#endif
+			if (!wait) flags |= MSG_DONTWAIT;
+
 			auto received_bytes { 0 };
 			if constexpr (sock_proto == protocol::tcp)
 			{
-#ifdef _WIN32
-				int flags = 0;
-#else
-				// Do not issue SIGPIPE signal on Linux in case of abnormal
-				// client disconnect, making behavior the same as in Windows.
-				int flags = MSG_NOSIGNAL;
-#endif
 				received_bytes = syscall_send(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), flags);
 			}
 #ifdef KISSNET_USE_OPENSSL
@@ -1328,9 +1330,9 @@ namespace kissnet
 			else if constexpr (sock_proto == protocol::udp)
 			{
 			    if (addr) {
-			        received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, reinterpret_cast<sockaddr*>(&addr->adrinf) , addr->sock_size);
+			        received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), flags, reinterpret_cast<sockaddr*>(&addr->adrinf) , addr->sock_size);
                 } else {
-                    received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), 0, static_cast<SOCKADDR*>(socket_addrinfo->ai_addr), socklen_t(socket_addrinfo->ai_addrlen));
+                    received_bytes = sendto(sock, reinterpret_cast<const char*>(read_buff), static_cast<buffsize_t>(length), flags, static_cast<SOCKADDR*>(socket_addrinfo->ai_addr), socklen_t(socket_addrinfo->ai_addrlen));
                 }
 			}
 
