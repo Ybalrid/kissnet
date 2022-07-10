@@ -121,6 +121,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #ifdef _WIN32
 
@@ -352,7 +353,6 @@ inline int get_error_code()
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
-#include <vector>
 #include <mutex>
 
 #endif //Kissnet use OpenSSL
