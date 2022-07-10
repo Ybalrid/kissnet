@@ -1308,10 +1308,11 @@ namespace kissnet
 		bytes_with_status send(const std::byte* read_buff, size_t length, bool wait = true, addr_collection* addr = nullptr)
 		{
 #ifdef _WIN32
-			int flags = 0, nonzero = 1;
+			int flags = 0;
+		       	u_long nonzero = 1;
 
 			// https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-ioctlsocket
-			if (!wait) ioctlsocket(sock, FIONBIO, nonzero);
+			if (!wait) ioctlsocket(sock, FIONBIO, &nonzero);
 #else
 			// Do not issue SIGPIPE signal on Linux in case of abnormal
 			// client disconnect, making behavior the same as in Windows.
