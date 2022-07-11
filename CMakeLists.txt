@@ -36,20 +36,18 @@ if(kissnet_BUILD_TESTING)
   add_subdirectory(tests)
 endif()
 
-if(PROJECT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-  include(GNUInstallDirs)
+include(GNUInstallDirs)
 
-  install(TARGETS kissnet
-    EXPORT kissnetTargets
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(TARGETS kissnet
+  EXPORT kissnetTargets
+  DESTINATION .)
 
-  install(EXPORT kissnetTargets
-    NAMESPACE kissnet::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kissnet)
+install(EXPORT kissnetTargets
+  NAMESPACE kissnet::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kissnet)
 
-  install(FILES kissnet.hpp
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-endif()
+install(FILES kissnet.hpp
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 include(FeatureSummary)
 add_feature_info(Tests kissnet_BUILD_TESTING "kissnet examples and tests")
