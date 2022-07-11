@@ -103,6 +103,16 @@
 #ifndef KISS_NET
 #define KISS_NET
 
+#ifdef _WIN32
+#ifdef kissnet_EXPORTS
+#define KISSNET_API __declspec(dllexport)
+#else
+#define KISSNET_API __declspec(dllimport)
+#endif
+#else // _WIN32
+#define KISSNET_API
+#endif // _WIN32
+
 ///Define this to not use exceptions
 #ifndef KISSNET_NO_EXCEP
 #define kissnet_fatal_error(STR) throw std::runtime_error(STR)
@@ -668,7 +678,7 @@ namespace kissnet
 
 	///Class that represent a socket
 	template <protocol sock_proto>
-	class socket
+	class KISSNET_API socket
 	{
 		///Represent a number of bytes with a status information. Some of the methods of this class returns this.
 		using bytes_with_status = std::tuple<size_t, socket_status>;
@@ -1137,6 +1147,8 @@ namespace kissnet
 				return socket_status::valid;
 			}
 #endif
+			// Makes no sense for UDP
+			return socket_status::errored;
 		}
 
 		///(for TCP= setup socket to listen to connection. Need to be called on binded socket, before being able to accept()
