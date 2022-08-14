@@ -1,0 +1,8 @@
+find_package(Threads)
+add_executable(udp_ntp_client main.cpp)
+if(Threads_FOUND)
+	target_link_libraries(udp_ntp_client PRIVATE Threads::Threads)
+endif()
+if(HAIKU)
+	target_link_libraries(udp_ntp_client PRIVATE network)
+endif(HAIKU)
