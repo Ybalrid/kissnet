@@ -916,7 +916,7 @@ namespace kissnet
 			if (ioctlsocket(sock, FIONBIO, &set) < 0)
 #else
 			const auto flags	= fcntl(sock, F_GETFL, 0);
-			const auto newflags = state ? flags | O_NONBLOCK : flags ^ O_NONBLOCK;
+			const auto newflags = state ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
 			if (fcntl(sock, F_SETFL, newflags) < 0)
 #endif
 				kissnet_fatal_error("setting socket to nonblock returned an error");
