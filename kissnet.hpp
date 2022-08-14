@@ -1394,18 +1394,18 @@ namespace kissnet
 		}
 
 		///Return an endpoint that originated the data in the last recv
-		endpoint get_recv_endpoint() const
-		{
-			if constexpr (sock_proto == protocol::tcp)
-			{
-				return get_bind_loc();
-			}
-			if constexpr (sock_proto == protocol::udp)
-			{
-				return { (sockaddr*)&socket_input };
-			}
-			return endpoint(nullptr);
-		}
+        endpoint get_recv_endpoint() const
+        {
+            if constexpr (sock_proto == protocol::tcp)
+            {
+                return get_bind_loc();
+            }
+            if constexpr (sock_proto == protocol::udp)
+            {
+                const SOCKADDR* addr = reinterpret_cast<const SOCKADDR*>(&socket_input);
+                return endpoint(const_cast<SOCKADDR*>(addr));
+            }
+        }
 
 		///Return the number of bytes available inside the socket
 		size_t bytes_available() const
