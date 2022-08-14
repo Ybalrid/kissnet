@@ -15,7 +15,7 @@ if(WIN32)
   set(WINSOCK_LIBRARIES wsock32 ws2_32 Iphlpapi)
 endif()
 
-foreach(t tcp_echo_server udp_multicast)
+foreach(t tcp_echo_server udp_multicast udp_ntp_server)
   add_subdirectory(${t})
   set_target_properties(${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
   target_link_libraries(${t} PRIVATE kissnet ${WINSOCK_LIBRARIES})
