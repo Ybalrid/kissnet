@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
 		while (true) { // wait for a response from server
 			std::this_thread::sleep_for(1s);
 
-			if (a_socket.bytes_available() == 48) { // expect 48 bytes back
+			if (a_socket.bytes_available() >= 48) { // expect 48 bytes back
 				//Get the data, and the lengh of data
 				const auto [data_size, status_code] = a_socket.recv(static_buffer);
 				const unsigned int *arr = reinterpret_cast<const unsigned int*>(static_buffer.data());
