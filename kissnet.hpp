@@ -778,8 +778,10 @@ namespace kissnet
 					return socket_status::errored;
 				}
 			}
-
-			kissnet_fatal_error("connect called for non-tcp socket");
+			else
+			{
+				kissnet_fatal_error("connect called for non-tcp socket");	
+			}
 		}
 
 		///sockaddr struct
