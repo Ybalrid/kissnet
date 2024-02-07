@@ -1,6 +1,6 @@
 # Contributors
 
-I would like to personally thank the following super nice people that submited patches with fixes and features to this project : 
+I would like to personally thank the following super nice people who submited patches with fixes and features to this project : 
 
 - Konstantin 'cpz' L. [@cpz](https://github.com/cpz)
 - Timothy Werquin [@timower](https://github.com/timower)
@@ -11,3 +11,4 @@ I would like to personally thank the following super nice people that submited p
 - Anders Cedronius [@andersc](https://github.com/andersc)
 - [@kauai68](https://github.com/kauai68)
 - Ben Ahlbrand [@bmahlbrand](https://github.com/bmahlbrand)
+- BullyWiiPlaza [@BullyWiiPlaza](https://github.com/BullyWiiPlaza)
