@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2018-2020 Arthur Brainville (Ybalrid) and with the help of
+ * Copyright (c) 2018-2024 Arthur Brainville (Ybalrid) and with the help of
  * Comunity Contributors!
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
