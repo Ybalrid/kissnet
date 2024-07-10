@@ -882,8 +882,7 @@ namespace kissnet
 			// Don't use AI_ADDRCONFIG if connecting to loopback
 			// See https://fedoraproject.org/wiki/QA/Networking/NameResolution/ADDRCONFIG
 			const std::string addr = bind_loc.address;
-			if (
-				addr == "localhost" || addr == "localhost.localdomain" || addr == "localhost6" || addr == "localhost6.localdomain6" || addr == "127.0.0.1" || addr == "::1")
+			if (addr == "localhost" || addr == "localhost.localdomain" || addr == "localhost6" || addr == "localhost6.localdomain6" || addr == "127.0.0.1" || addr == "::1")
 			{
 				getaddrinfo_hints.ai_flags = 0;
 			}
