@@ -879,7 +879,15 @@ namespace kissnet
 			//Do we use streams or datagrams
 			initialize_addrinfo();
 
-			if (getaddrinfo(bind_loc.address.c_str(), std::to_string(bind_loc.port).c_str(), &getaddrinfo_hints, &getaddrinfo_results) != 0)
+			// Don't use AI_ADDRCONFIG if connecting to loopback
+			// See https://fedoraproject.org/wiki/QA/Networking/NameResolution/ADDRCONFIG
+			const std::string addr = bind_loc.address;
+			if (
+				addr == "localhost" || addr == "localhost.localdomain" || addr == "localhost6" || addr == "localhost6.localdomain6" || addr == "127.0.0.1" || addr == "::1")
+			{
+				getaddrinfo_hints.ai_flags = 0;
+			}
+			if (getaddrinfo(addr.c_str(), std::to_string(bind_loc.port).c_str(), &getaddrinfo_hints, &getaddrinfo_results) != 0)
 			{
 				kissnet_fatal_error("getaddrinfo failed!");
 			}
