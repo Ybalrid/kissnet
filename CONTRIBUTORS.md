@@ -13,3 +13,4 @@ I would like to personally thank the following super nice people who submitted p
 - Ben Ahlbrand [@bmahlbrand](https://github.com/bmahlbrand)
 - BullyWiiPlaza [@BullyWiiPlaza](https://github.com/BullyWiiPlaza)
 - [@SushiTee](https://github.com/SushiTee)
+- Rikke Solbjørg [@solbjorg](https://github.com/solbjorg)
