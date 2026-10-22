@@ -116,6 +116,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cassert>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -714,7 +715,7 @@ namespace kissnet
 		}
 
 		///Create and connect to socket
-		socket_status connect(addrinfo* addr, int64_t timeout, bool createsocket)
+		socket_status connect(addrinfo* addr, int64_t timeout, bool createsocket, const std::function<bool()>& should_abort = { })
 		{
 			if constexpr (sock_proto == protocol::tcp || sock_proto == protocol::tcp_ssl) //only TCP is a connected protocol
 			{
@@ -739,18 +740,26 @@ namespace kissnet
 					error = get_error_code();
 					if (error == EWOULDBLOCK || error == EAGAIN || error == EINPROGRESS)
 					{
-						struct timeval tv;
-						tv.tv_sec  = static_cast<long>(timeout / 1000);
-						tv.tv_usec = 1000 * static_cast<long>(timeout % 1000);
+						// Wait in slices, so that should_abort is checked regularly
+						int ret			  = 0;
+						int64_t remaining = timeout;
+						do
+						{
+							const int64_t slice = should_abort && remaining > 100 ? 100 : remaining;
+							struct timeval tv;
+							tv.tv_sec  = static_cast<long>(slice / 1000);
+							tv.tv_usec = 1000 * static_cast<long>(slice % 1000);
 
-						fd_set fd_write, fd_except;
-						;
-						FD_ZERO(&fd_write);
-						FD_SET(sock, &fd_write);
-						FD_ZERO(&fd_except);
-						FD_SET(sock, &fd_except);
+							fd_set fd_write, fd_except;
+							FD_ZERO(&fd_write);
+							FD_SET(sock, &fd_write);
+							FD_ZERO(&fd_except);
+							FD_SET(sock, &fd_except);
 
-						int ret = syscall_select(static_cast<int>(sock) + 1, NULL, &fd_write, &fd_except, &tv);
+							ret = syscall_select(static_cast<int>(sock) + 1, NULL, &fd_write, &fd_except, &tv);
+							remaining -= slice;
+						} while (ret == 0 && remaining > 0 && !(should_abort && should_abort()));
+
 						if (ret == -1)
 							error = get_error_code();
 						else if (ret == 0)
@@ -1071,13 +1080,14 @@ namespace kissnet
         }
 
 		///(For TCP) connect to the endpoint as client
-		socket_status connect(int64_t timeout = 0)
+		///\param should_abort if given, called regularly while waiting; returning true gives up
+		socket_status connect(int64_t timeout = 0, const std::function<bool()>& should_abort = { })
 		{
 			if constexpr (sock_proto == protocol::tcp) //only TCP is a connected protocol
 			{
 				// try to connect to existing native socket, if any.
 				auto curr_addr = socket_addrinfo;
-				if (connect(curr_addr, timeout, false) != socket_status::valid)
+				if (connect(curr_addr, timeout, false, should_abort) != socket_status::valid)
 				{
 					// try to create/connect native socket for one of the other addrinfo, if any
 					for (auto* addr = getaddrinfo_results; addr; addr = addr->ai_next)
@@ -1085,7 +1095,10 @@ namespace kissnet
 						if (addr == curr_addr)
 							continue; // already checked
 
-						if (connect(addr, timeout, true) == socket_status::valid)
+						if (should_abort && should_abort())
+							break;
+
+						if (connect(addr, timeout, true, should_abort) == socket_status::valid)
 							break; // success
 					}
 				}
